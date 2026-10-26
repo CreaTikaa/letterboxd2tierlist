@@ -76,3 +76,5 @@ Pushing to `main` runs lint, tests and build, then deploys to GitHub Pages (`.gi
 ## Credits
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd, TierMaker or UwUfufu.
+Thanks to letterboxd for their amazing website.
+Thanks to Claude Code allowing me to make this.
