@@ -1,26 +1,28 @@
 import { useEffect, useState } from 'react'
-import { AutoFillDialog } from './components/AutoFillDialog'
-import { Board } from './components/board/Board'
-import { EnrichmentStatus } from './components/EnrichmentStatus'
 import { ExportDialog } from './components/ExportDialog'
-import { FilterBar } from './components/FilterBar'
 import { Header } from './components/Header'
-import { ImportPanel } from './components/ImportPanel'
 import { MatchDialog } from './components/MatchDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Toast } from './components/Toast'
 import { useHydrated } from './hooks'
+import { RoomPage } from './pages/RoomPage'
+import { RoomsLobby } from './pages/RoomsLobby'
+import { TierListPage } from './pages/TierListPage'
+import { TournamentPage } from './pages/TournamentPage'
+import { useRoute } from './router'
 import { startEnrichment } from './store/enrichment'
 import { useStore } from './store/useStore'
 
-type DialogName = 'settings' | 'export' | 'autofill' | null
+type DialogName = 'settings' | 'export' | null
 
 export default function App() {
   const hydrated = useHydrated()
+  const route = useRoute()
   const films = useStore((s) => s.films)
   const tmdbKey = useStore((s) => s.tmdbKey)
   const [dialog, setDialog] = useState<DialogName>(null)
   const close = () => setDialog(null)
+  const openSettings = () => setDialog('settings')
 
   // Look up posters for new films whenever the library or the key changes.
   useEffect(() => {
@@ -31,18 +33,13 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header onSettings={() => setDialog('settings')} onExport={() => setDialog('export')} />
+      <Header onSettings={openSettings} onExport={() => setDialog('export')} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-4 px-4 py-4">
-        {films.length === 0 ? (
-          <ImportPanel />
-        ) : (
-          <>
-            <EnrichmentStatus onOpenSettings={() => setDialog('settings')} />
-            <FilterBar />
-            <Board onAutoFill={() => setDialog('autofill')} />
-          </>
-        )}
+        {route.page === 'tierlist' && <TierListPage onOpenSettings={openSettings} />}
+        {route.page === 'rooms' && <RoomsLobby />}
+        {route.page === 'room' && <RoomPage key={route.roomId} roomId={route.roomId} onOpenSettings={openSettings} />}
+        {route.page === 'tournament' && <TournamentPage />}
       </main>
 
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">
@@ -51,7 +48,7 @@ export default function App() {
           <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-lb-blue hover:underline">
             TMDB
           </a>
-          . This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd or TierMaker.
+          . This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd, TierMaker or UwUfufu.
         </p>
         <p className="mt-1">
           Your data stays in your browser ·{' '}
@@ -63,7 +60,6 @@ export default function App() {
 
       <SettingsDialog open={dialog === 'settings'} onClose={close} />
       <ExportDialog open={dialog === 'export'} onClose={close} />
-      <AutoFillDialog open={dialog === 'autofill'} onClose={close} />
       <MatchDialog />
       <Toast />
     </div>

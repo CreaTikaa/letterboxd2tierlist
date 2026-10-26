@@ -1,6 +1,8 @@
 # letterboxd2tierlist
 
-Turn every film you've logged on [Letterboxd](https://letterboxd.com) into a tier list, filtered by your own star ratings.
+Turn every film you've logged on [Letterboxd](https://letterboxd.com) into a tier list, filtered by your own star ratings. Rank together with friends in a room, or crown your favourite film in a tournament.
+
+### Tier list
 
 - **Import** your Letterboxd data export (ZIP). It's parsed entirely in your browser; nothing is uploaded.
 - **Posters** are fetched from [TMDB](https://www.themoviedb.org) with your own free API key.
@@ -10,6 +12,21 @@ Turn every film you've logged on [Letterboxd](https://letterboxd.com) into a tie
   - a **PNG** of your tier list,
   - a **TierMaker poster pack** (ZIP of posters named `Title (Year).jpg`, split into 500-image batches) to upload as a [TierMaker](https://tiermaker.com/create) template, optionally with the title and your rating drawn on each poster,
   - a **JSON save file** to back up or move your board.
+
+### Rooms (with friends)
+
+- **Create a room** and send the invite link. Everyone shares their Letterboxd films with the room.
+- **Group board**: one tier list everyone edits live. It holds every film anyone has watched, each showing the group's average rating and how many people saw it. Filter by group average or by "seen by at least N people", and auto-fill from the average.
+- **Showdown**: the host picks a set of films (for example, ones everyone has seen). Everyone ranks them on their own board in secret, the host reveals all the lists at once, and everyone votes for the best 👑 and worst 💀 list. The results show the winner and the films that split the room most.
+- Posters are fetched by anyone in the room who has a TMDB key, then shared with everyone else.
+
+Rooms are **peer-to-peer** (WebRTC via [Trystero](https://github.com/dmotz/trystero)). Browsers find each other through public Nostr relays and then talk directly. There's no server and nothing stored online. The room's first visitor acts as host; if they leave, another member takes over automatically. Every browser keeps a copy of the room, so anyone can reopen it later from the same link. Some strict networks (certain corporate or mobile ones) block direct connections.
+
+### Tournament (UwUfufu-style)
+
+- Pick a bracket of 8–256 films: your top-rated ones or a random draw, filtered by minimum rating.
+- Films are **seeded by your rating**, so your favourites can only meet in the late rounds. Top seeds get byes when the count isn't a power of two.
+- Pick one film per matchup (click, or press ←/→, with Z to undo) until a champion remains. You get final standings, the biggest upsets and a downloadable results image.
 
 ## Using it
 
@@ -36,20 +53,25 @@ npm run lint       # oxlint
 npm run build      # type-check + production build into dist/
 ```
 
-Stack: Vite, React, TypeScript, Tailwind CSS, dnd-kit (drag and drop), Zustand + IndexedDB (state that persists between visits), JSZip, PapaParse.
+Stack: Vite, React, TypeScript, Tailwind CSS, dnd-kit (drag and drop), Zustand + IndexedDB (state that persists between visits), JSZip, PapaParse, Trystero (peer-to-peer rooms).
 
 ```
 src/
   lib/letterboxd/   export ZIP/CSV parsing and merging
   lib/tmdb/         TMDB client and title/year matching
-  lib/export/       PNG renderer, TierMaker ZIP, save files
+  lib/export/       PNG renderers, TierMaker ZIP, save files
+  lib/room/         room state, ops, sync protocol (session.ts), group merging, showdown scoring
+  lib/tournament.ts bracket seeding, picks, standings
   lib/              filters, tiers, rating helpers
-  store/            Zustand store, poster lookup, import
-  components/       UI (board/ holds the drag-and-drop tier board)
+  store/            Zustand stores (app, room session), poster lookup, import
+  pages/            tier list, rooms lobby, room, tournament (hash routes: #/, #/rooms, #/room/CODE, #/tournament)
+  components/       UI (board/ = drag-and-drop tier board, room/ = room panels)
 ```
+
+The room protocol is host-authoritative. The host numbers every change and broadcasts it; followers apply changes in order and fetch a full snapshot when they detect a gap. When two hosts meet, the one with the newer room wins. The protocol sits behind a small `Transport` interface, so `session.test.ts` runs it against an in-memory network to test joining, syncing, host hand-off and room revival.
 
 Pushing to `main` runs lint, tests and build, then deploys to GitHub Pages (`.github/workflows/deploy.yml`).
 
 ## Credits
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd or TierMaker.
+This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd, TierMaker or UwUfufu.

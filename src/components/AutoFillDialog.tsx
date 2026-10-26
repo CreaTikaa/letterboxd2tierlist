@@ -1,32 +1,40 @@
 import { useMemo } from 'react'
-import { useVisibleFilms } from '../hooks'
 import { countByRating } from '../lib/filter'
 import { RATING_VALUES, ratingKey, stars } from '../lib/ratings'
-import { defaultRatingMap } from '../lib/tiers'
+import { autoFill, defaultRatingMap } from '../lib/tiers'
+import type { Film, RatingMap, Tier } from '../lib/types'
 import { useStore } from '../store/useStore'
 import { Button, Dialog, inputClass } from './ui'
 
-export function AutoFillDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const tiers = useStore((s) => s.tiers)
-  const ratingMap = useStore((s) => s.ratingMap)
-  const setRatingMap = useStore((s) => s.setRatingMap)
-  const autoFill = useStore((s) => s.autoFill)
+interface Props {
+  open: boolean
+  onClose: () => void
+  tiers: Tier[]
+  /** Visible films; these are the ones that get placed. */
+  films: Film[]
+  ratingMap: RatingMap
+  onRatingMapChange: (map: RatingMap) => void
+  onApply: (tiers: Tier[]) => void
+  description?: string
+}
+
+export function AutoFillDialog({ open, onClose, tiers, films, ratingMap, onRatingMapChange, onApply, description }: Props) {
   const notify = useStore((s) => s.notify)
-  const visible = useVisibleFilms()
-  const counts = useMemo(() => countByRating(visible), [visible])
+  const counts = useMemo(() => countByRating(films), [films])
   const tierIds = new Set(tiers.map((t) => t.id))
 
   const apply = () => {
-    autoFill(visible)
+    onApply(autoFill(tiers, films, ratingMap))
     onClose()
-    notify({ kind: 'success', text: `Placed ${visible.filter((f) => f.rating != null && tierIds.has(ratingMap[ratingKey(f.rating)])).length} films by rating.` })
+    notify({ kind: 'success', text: `Placed ${films.filter((f) => f.rating != null && tierIds.has(ratingMap[ratingKey(f.rating)])).length} films by rating.` })
   }
 
   return (
     <Dialog open={open} onClose={onClose} title="Auto-fill by rating">
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          Choose the tier for each rating. Applying moves every visible film to its tier, including ones you've already placed. Unrated films stay in the pool.
+          {description ??
+            "Choose the tier for each rating. Applying moves every visible film to its tier, including ones you've already placed. Unrated films stay in the pool."}
         </p>
         <table className="w-full text-sm">
           <tbody>
@@ -38,7 +46,7 @@ export function AutoFillDialog({ open, onClose }: { open: boolean; onClose: () =
                   <td className="py-1.5 text-lb-green">{stars(rating)}</td>
                   <td className="py-1.5 text-muted">{counts.get(rating) ?? 0} films</td>
                   <td className="py-1.5 text-right">
-                    <select value={value} onChange={(e) => setRatingMap({ ...ratingMap, [key]: e.target.value })} className={`${inputClass} w-40`}>
+                    <select value={value} onChange={(e) => onRatingMapChange({ ...ratingMap, [key]: e.target.value })} className={`${inputClass} w-40`}>
                       {tiers.map((tier) => (
                         <option key={tier.id} value={tier.id}>
                           {tier.label || '(unnamed)'}
@@ -53,11 +61,11 @@ export function AutoFillDialog({ open, onClose }: { open: boolean; onClose: () =
           </tbody>
         </table>
         <div className="flex justify-between gap-2">
-          <Button variant="ghost" onClick={() => setRatingMap(defaultRatingMap(tiers))}>
+          <Button variant="ghost" onClick={() => onRatingMapChange(defaultRatingMap(tiers))}>
             Reset mapping
           </Button>
           <Button variant="primary" onClick={apply}>
-            Apply to {visible.length} visible films
+            Apply to {films.length} visible films
           </Button>
         </div>
       </div>

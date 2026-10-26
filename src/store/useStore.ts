@@ -3,7 +3,9 @@ import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import type { SaveFile } from '../lib/export/saveFile'
 import { DEFAULT_FILTERS } from '../lib/filter'
-import { TIER_COLORS, autoFill, defaultRatingMap, defaultTiers, newTierId } from '../lib/tiers'
+import { randomId } from '../lib/random'
+import { defaultRatingMap, defaultTiers } from '../lib/tiers'
+import type { Tournament } from '../lib/tournament'
 import type { Film, Filters, Match, PoolSort, RatingMap, Tier } from '../lib/types'
 
 export interface Enrichment {
@@ -29,9 +31,14 @@ interface State {
   cardWidth: number
   showRatings: boolean
   enrichment: Enrichment
-  /** Film whose TMDB match is being fixed in the match dialog. */
-  editingFilmId: string | null
+  /** Film whose details/TMDB match are shown in the match dialog. */
+  editingFilm: Film | null
   notice: Notice | null
+  /** Identity used in rooms; memberId is stable per browser. */
+  profile: { memberId: string; name: string }
+  tournament: Tournament | null
+  /** Room codes visited, most recent first. */
+  recentRooms: string[]
 }
 
 interface Actions {
@@ -41,24 +48,21 @@ interface Actions {
   setMatches: (matches: Record<string, Match>) => void
   setEnrichment: (enrichment: Partial<Enrichment>) => void
   setTiers: (tiers: Tier[]) => void
-  updateTier: (id: string, changes: Partial<Omit<Tier, 'id'>>) => void
-  addTier: () => void
-  removeTier: (id: string) => void
-  moveTier: (id: string, offset: -1 | 1) => void
   setRatingMap: (map: RatingMap) => void
-  autoFill: (films: Film[]) => void
-  clearBoard: () => void
   setPoolSort: (sort: PoolSort) => void
   setCardWidth: (width: number) => void
   setShowRatings: (show: boolean) => void
-  setEditingFilm: (id: string | null) => void
+  setEditingFilm: (film: Film | null) => void
   loadSave: (save: SaveFile) => void
   clearMatches: () => void
   resetAll: () => void
   notify: (notice: Notice | null) => void
+  setProfileName: (name: string) => void
+  setTournament: (tournament: Tournament | null) => void
+  rememberRoom: (roomId: string) => void
 }
 
-const idbStorage: StateStorage = {
+export const idbStorage: StateStorage = {
   getItem: async (name) => (await get<string>(name)) ?? null,
   setItem: (name, value) => set(name, value),
   removeItem: (name) => del(name),
@@ -77,8 +81,11 @@ const initialState: State = {
   cardWidth: 72,
   showRatings: true,
   enrichment: { running: false, done: 0, total: 0, error: null },
-  editingFilmId: null,
+  editingFilm: null,
   notice: null,
+  profile: { memberId: randomId(12), name: '' },
+  tournament: null,
+  recentRooms: [],
 }
 
 export const useStore = create<State & Actions>()(
@@ -100,32 +107,11 @@ export const useStore = create<State & Actions>()(
       setMatches: (matches) => setState((s) => ({ matches: { ...s.matches, ...matches } })),
       setEnrichment: (enrichment) => setState((s) => ({ enrichment: { ...s.enrichment, ...enrichment } })),
       setTiers: (tiers) => setState({ tiers }),
-      updateTier: (id, changes) => setState((s) => ({ tiers: s.tiers.map((t) => (t.id === id ? { ...t, ...changes } : t)) })),
-      addTier: () =>
-        setState((s) => ({
-          tiers: [...s.tiers, { id: newTierId(), label: 'New', color: TIER_COLORS[s.tiers.length % TIER_COLORS.length], filmIds: [] }],
-        })),
-      removeTier: (id) =>
-        setState((s) => ({
-          tiers: s.tiers.filter((t) => t.id !== id),
-          ratingMap: Object.fromEntries(Object.entries(s.ratingMap).map(([r, tierId]) => [r, tierId === id ? '' : tierId])),
-        })),
-      moveTier: (id, offset) =>
-        setState((s) => {
-          const from = s.tiers.findIndex((t) => t.id === id)
-          const to = from + offset
-          if (from < 0 || to < 0 || to >= s.tiers.length) return {}
-          const tiers = [...s.tiers]
-          ;[tiers[from], tiers[to]] = [tiers[to], tiers[from]]
-          return { tiers }
-        }),
       setRatingMap: (ratingMap) => setState({ ratingMap }),
-      autoFill: (films) => setState((s) => ({ tiers: autoFill(s.tiers, films, s.ratingMap) })),
-      clearBoard: () => setState((s) => ({ tiers: s.tiers.map((t) => ({ ...t, filmIds: [] })) })),
       setPoolSort: (poolSort) => setState({ poolSort }),
       setCardWidth: (cardWidth) => setState({ cardWidth }),
       setShowRatings: (showRatings) => setState({ showRatings }),
-      setEditingFilm: (editingFilmId) => setState({ editingFilmId }),
+      setEditingFilm: (editingFilm) => setState({ editingFilm }),
       loadSave: (save) =>
         setState((s) => ({
           films: save.films,
@@ -135,14 +121,17 @@ export const useStore = create<State & Actions>()(
           filters: { ...DEFAULT_FILTERS, ...save.filters },
         })),
       clearMatches: () => setState((s) => ({ matches: Object.fromEntries(Object.entries(s.matches).filter(([, m]) => m.status === 'matched' && m.manual)) })),
-      resetAll: () => setState((s) => ({ ...initialState, tmdbKey: s.tmdbKey })),
+      resetAll: () => setState((s) => ({ ...initialState, tmdbKey: s.tmdbKey, profile: s.profile })),
       notify: (notice) => setState({ notice }),
+      setProfileName: (name) => setState((s) => ({ profile: { ...s.profile, name: name.slice(0, 24) } })),
+      setTournament: (tournament) => setState({ tournament }),
+      rememberRoom: (roomId) => setState((s) => ({ recentRooms: [roomId, ...s.recentRooms.filter((id) => id !== roomId)].slice(0, 8) })),
     }),
     {
       name: 'letterboxd2tierlist',
       version: 1,
       storage: createJSONStorage(() => idbStorage),
-      partialize: ({ enrichment: _e, editingFilmId: _id, notice: _n, ...persisted }) => persisted,
+      partialize: ({ enrichment: _e, editingFilm: _f, notice: _n, ...persisted }) => persisted,
     },
   ),
 )
