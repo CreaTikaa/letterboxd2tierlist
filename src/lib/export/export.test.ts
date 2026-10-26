@@ -51,7 +51,7 @@ describe('layoutColumns', () => {
 
 describe('save files', () => {
   it('round-trips through JSON', () => {
-    const save = createSaveFile({ films: [], matches: {}, tiers: defaultTiers(), ratingMap: {}, filters: { ratings: [5], includeUnrated: false, search: '', yearMin: null, yearMax: null } })
+    const save = createSaveFile({ films: [], matches: {}, tiers: defaultTiers(), ratingMap: {}, filters: { ratings: [5], includeUnrated: false, search: '', yearMin: null, yearMax: null, genres: [] } })
     expect(parseSaveFile(JSON.stringify(save))).toEqual(save)
   })
 

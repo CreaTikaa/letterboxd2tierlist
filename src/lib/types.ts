@@ -16,6 +16,8 @@ export type Match =
       title: string
       year: number | null
       posterPath: string | null
+      /** TMDB genre ids; undefined for matches cached before genres were stored. */
+      genreIds?: number[]
       /** True when the user picked this match by hand; never overwritten automatically. */
       manual?: boolean
     }
@@ -38,6 +40,8 @@ export interface Filters {
   search: string
   yearMin: number | null
   yearMax: number | null
+  /** TMDB genre ids; a film passes if it has any of them. Empty = all genres. */
+  genres: number[]
 }
 
 export type PoolSort = 'rating' | 'title' | 'year' | 'watched'

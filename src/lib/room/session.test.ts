@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { defaultTiers } from '../tiers'
 import type { Film, Match } from '../types'
 import { MemoryNetwork, type MemoryNode } from './memoryTransport'
+import { emptyShowdown } from './reducer'
 import { RoomSession, type SessionView } from './session'
 import type { Member, RoomState } from './types'
 
@@ -14,7 +15,7 @@ interface Peer {
   matches: Record<string, Match>
 }
 
-function peer(network: MemoryNetwork, memberId: string, initialState: RoomState | null = null): Peer {
+function peer(network: MemoryNetwork, memberId: string, initialState: RoomState | null = null, creating = false): Peer {
   const node = network.node(`peer-${memberId}`)
   let view: SessionView | null = null
   const matches: Record<string, Match> = {}
@@ -23,6 +24,7 @@ function peer(network: MemoryNetwork, memberId: string, initialState: RoomState 
     memberId,
     name: memberId.toUpperCase(),
     initialState,
+    creating,
     onChange: (v) => (view = v),
     getMatches: (ids) => Object.fromEntries(ids.filter((id) => matches[id]).map((id) => [id, matches[id]])),
     onMatches: (m) => Object.assign(matches, m),
@@ -105,7 +107,7 @@ describe('RoomSession', () => {
 
   it('lets the freshest copy win when two hosts meet (room revival)', () => {
     const net = new MemoryNetwork()
-    const saved: RoomState = { id: 'room', version: 7, members: { a: member('a', [film('x', 4)]) }, board: boardWith('x'), showdown: { phase: 'idle', round: 0, filmIds: [], tiers: [], boards: {}, votes: {} }, tournament: { bracket: null, votes: {}, log: [] } }
+    const saved: RoomState = { id: 'room', anchored: true, version: 7, members: { a: member('a', [film('x', 4)]) }, board: boardWith('x'), showdown: emptyShowdown(), tournament: { bracket: null, votes: {}, log: [] } }
     // The fresh peer has the smaller member id, but the reviver's copy is newer.
     const fresh = peer(net, '0')
     const reviver = peer(net, 'z', saved)
@@ -149,6 +151,27 @@ describe('RoomSession', () => {
     net.connect(b.node, c.node)
     net.settle()
     expect(c.view().state.board[0].filmIds).toEqual(['solo'])
+  })
+
+  it("doesn't let a fresh joiner who shared before connecting take over the room", () => {
+    const net = new MemoryNetwork()
+    // 'z-creator' created the room; 'a-joiner' opened the invite link and shared right away, while still alone.
+    const creator = peer(net, 'z-creator', null, true)
+    creator.session.dispatch({ t: 'board', tiers: boardWith('creator-board') })
+    const joiner = peer(net, 'a-joiner')
+    joiner.session.dispatch({ t: 'member', member: member('a-joiner', [film('mine', 3)]) })
+    joiner.session.dispatch({ t: 'board', tiers: boardWith('joiner-board') })
+    joiner.session.dispatch({ t: 'board', tiers: boardWith('joiner-board-2') })
+    // The joiner has the newer version and the smaller id, but the creator's copy is anchored.
+    net.connect(creator.node, joiner.node)
+    net.settle()
+
+    expect(creator.view().isHost).toBe(true)
+    expect(joiner.view().hostMemberId).toBe('z-creator')
+    expect(joiner.view().state.board[0].filmIds).toEqual(['creator-board'])
+    expect(joiner.view().state.anchored).toBe(true)
+    // The joiner's films are re-shared to the real room.
+    expect(creator.view().state.members['a-joiner'].films[0].id).toBe('mine')
   })
 
   it('broadcasts poster matches', () => {

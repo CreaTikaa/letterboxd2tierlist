@@ -8,6 +8,10 @@ export interface TmdbMovie {
   release_date?: string
   poster_path: string | null
   popularity?: number
+  /** Search results list genre ids… */
+  genre_ids?: number[]
+  /** …while movie details list genre objects. */
+  genres?: { id: number; name: string }[]
 }
 
 export class TmdbError extends Error {

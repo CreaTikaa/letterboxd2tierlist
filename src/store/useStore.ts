@@ -1,6 +1,6 @@
 import { del, get, set } from 'idb-keyval'
 import { create } from 'zustand'
-import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import type { SaveFile } from '../lib/export/saveFile'
 import { DEFAULT_FILTERS } from '../lib/filter'
 import { randomId } from '../lib/random'
@@ -39,7 +39,11 @@ interface State {
   tournament: Tournament | null
   /** Room codes visited, most recent first. */
   recentRooms: string[]
+  /** Room passwords you've used, so rejoining doesn't ask again. */
+  roomPasswords: Record<string, string>
 }
+
+type PersistedState = Omit<State, 'enrichment' | 'editingFilm' | 'notice'>
 
 interface Actions {
   importFilms: (films: Film[]) => void
@@ -60,13 +64,50 @@ interface Actions {
   setProfileName: (name: string) => void
   setTournament: (tournament: Tournament | null) => void
   rememberRoom: (roomId: string) => void
+  setRoomPassword: (roomId: string, password: string) => void
 }
 
-export const idbStorage: StateStorage = {
-  getItem: async (name) => (await get<string>(name)) ?? null,
-  setItem: (name, value) => set(name, value),
-  removeItem: (name) => del(name),
+/**
+ * IndexedDB storage for the persisted state. The state (whole library + poster cache) is stored as
+ * an object, not a JSON string, and writes are batched: zustand calls `setItem` on every change,
+ * and serialising everything for each drag or poster batch would be wasteful. A short delay keeps
+ * a reload right after a change safe; pending writes are also flushed when the tab is hidden.
+ */
+const pendingWrites = new Map<string, unknown>()
+let writeTimer: ReturnType<typeof setTimeout> | null = null
+
+function flushWrites() {
+  if (writeTimer) clearTimeout(writeTimer)
+  writeTimer = null
+  for (const [name, value] of pendingWrites) void set(name, value)
+  pendingWrites.clear()
 }
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushWrites)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flushWrites())
+}
+
+function idbStorage<S>(): PersistStorage<S> {
+  return {
+    getItem: async (name) => {
+      const value = pendingWrites.get(name) ?? (await get(name))
+      // Older versions stored a JSON string.
+      return (typeof value === 'string' ? JSON.parse(value) : (value ?? null)) as StorageValue<S> | null
+    },
+    setItem: (name, value) => {
+      pendingWrites.set(name, value)
+      writeTimer ??= setTimeout(flushWrites, 150)
+    },
+    removeItem: (name) => {
+      pendingWrites.delete(name)
+      return del(name)
+    },
+  }
+}
+
+/** How many rooms keep a local copy (and show under "Recent rooms"). */
+const RECENT_ROOMS = 8
 
 const initialTiers = defaultTiers()
 
@@ -86,6 +127,7 @@ const initialState: State = {
   profile: { memberId: randomId(12), name: '' },
   tournament: null,
   recentRooms: [],
+  roomPasswords: {},
 }
 
 export const useStore = create<State & Actions>()(
@@ -125,13 +167,26 @@ export const useStore = create<State & Actions>()(
       notify: (notice) => setState({ notice }),
       setProfileName: (name) => setState((s) => ({ profile: { ...s.profile, name: name.slice(0, 24) } })),
       setTournament: (tournament) => setState({ tournament }),
-      rememberRoom: (roomId) => setState((s) => ({ recentRooms: [roomId, ...s.recentRooms.filter((id) => id !== roomId)].slice(0, 8) })),
+      setRoomPassword: (roomId, password) =>
+        setState((s) => {
+          const { [roomId]: _old, ...rest } = s.roomPasswords
+          return { roomPasswords: password ? { ...rest, [roomId]: password } : rest }
+        }),
+      rememberRoom: (roomId) =>
+        setState((s) => {
+          const recentRooms = [roomId, ...s.recentRooms.filter((id) => id !== roomId)]
+          // Forget rooms that fall off the list, including their saved copy.
+          for (const old of recentRooms.slice(RECENT_ROOMS)) void del(`room:${old}`)
+          return { recentRooms: recentRooms.slice(0, RECENT_ROOMS) }
+        }),
     }),
     {
       name: 'letterboxd2tierlist',
       version: 1,
-      storage: createJSONStorage(() => idbStorage),
-      partialize: ({ enrichment: _e, editingFilm: _f, notice: _n, ...persisted }) => persisted,
+      storage: idbStorage<PersistedState>(),
+      // Data only: transient UI state is left out, and actions can't be stored as objects.
+      partialize: ({ enrichment: _e, editingFilm: _f, notice: _n, ...rest }) =>
+        Object.fromEntries(Object.entries(rest).filter(([, value]) => typeof value !== 'function')) as PersistedState,
     },
   ),
 )

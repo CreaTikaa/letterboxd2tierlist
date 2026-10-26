@@ -1,4 +1,6 @@
-import { type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import { countByGenre } from '../../lib/filter'
+import { genreName } from '../../lib/genres'
 import { ratingText, stars } from '../../lib/ratings'
 import { posterUrl } from '../../lib/tmdb/client'
 import {
@@ -28,6 +30,26 @@ export function BracketSizeSelect({ value, options, onChange }: { value: number;
         {options.map((n) => (
           <option key={n} value={n}>
             {BRACKET_SIZES.includes(n) ? `${n} films` : `All ${n} films`}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** "Any genre" or one genre present among `films` (0 = any). Hidden until posters (and genres) are loaded. */
+export function GenreSelect({ films, value, onChange }: { films: Film[]; value: number; onChange: (genre: number) => void }) {
+  const matches = useStore((s) => s.matches)
+  const counts = useMemo(() => [...countByGenre(films, matches)].sort((a, b) => b[1] - a[1]), [films, matches])
+  if (counts.length === 0) return null
+  return (
+    <label className="flex flex-col gap-1 text-muted">
+      Genre
+      <select value={value} onChange={(e) => onChange(Number(e.target.value))} className={inputClass}>
+        <option value={0}>Any genre</option>
+        {counts.map(([genre, count]) => (
+          <option key={genre} value={genre}>
+            {genreName(genre)} ({count})
           </option>
         ))}
       </select>

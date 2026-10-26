@@ -112,5 +112,7 @@ describe('group tournament voting', () => {
   it('fills in the tournament for rooms saved before it existed', () => {
     const { tournament: _t, ...old } = emptyRoomState('r')
     expect(normalizeRoomState(old as RoomState).tournament).toEqual({ bracket: null, votes: {}, log: [] })
+    const { anchored: _a, ...unanchored } = emptyRoomState('r')
+    expect(normalizeRoomState(unanchored as RoomState).anchored).toBe(true)
   })
 })

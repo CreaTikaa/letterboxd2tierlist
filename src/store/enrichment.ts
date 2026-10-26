@@ -1,5 +1,5 @@
 import { runPool } from '../lib/pool'
-import { TmdbError } from '../lib/tmdb/client'
+import { TmdbError, getMovie } from '../lib/tmdb/client'
 import { findMatch } from '../lib/tmdb/match'
 import type { Film, Match } from '../lib/types'
 import { useStore } from './useStore'
@@ -8,8 +8,20 @@ let controller: AbortController | null = null
 /** Films requested while a run was in progress; picked up by the next pass. */
 let queued = new Map<string, Film>()
 
+/** Matches cached before genres were stored need one details request to fill them in. */
+const needsGenres = (match: Match | undefined) => match?.status === 'matched' && match.genreIds === undefined
+
+async function lookUp(key: string, film: Film, existing: Match | undefined, signal: AbortSignal): Promise<Match> {
+  if (existing?.status === 'matched' && needsGenres(existing)) {
+    const details = await getMovie(key, existing.tmdbId, signal)
+    return { ...existing, genreIds: details.genres?.map((g) => g.id) ?? [] }
+  }
+  return findMatch(key, film, signal)
+}
+
 /**
- * Looks up a TMDB match for every given film (default: the imported library) that doesn't have one yet.
+ * Looks up a TMDB match for every given film (default: the imported library) that doesn't have one yet,
+ * and backfills genres for older matches.
  * Calls made while a lookup is running are queued and handled in the same run.
  */
 export async function startEnrichment(films: Film[] = useStore.getState().films) {
@@ -26,7 +38,7 @@ export async function startEnrichment(films: Film[] = useStore.getState().films)
 
   while (queued.size && !ctrl.signal.aborted) {
     const { matches, setMatches, setEnrichment } = useStore.getState()
-    const pending = [...queued.values()].filter((f) => !matches[f.id])
+    const pending = [...queued.values()].filter((f) => !matches[f.id] || needsGenres(matches[f.id]))
     queued = new Map()
     if (pending.length === 0) break
     total += pending.length
@@ -47,7 +59,7 @@ export async function startEnrichment(films: Film[] = useStore.getState().films)
       6,
       async (film) => {
         try {
-          buffer[film.id] = await findMatch(tmdbKey, film, ctrl.signal)
+          buffer[film.id] = await lookUp(tmdbKey, film, matches[film.id], ctrl.signal)
         } catch (error) {
           if (ctrl.signal.aborted) return
           if (error instanceof TmdbError && error.status === 401) {

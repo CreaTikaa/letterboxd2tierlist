@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { dateStamp, downloadBlob } from '../../lib/download'
 import { renderTournamentPng } from '../../lib/export/tournamentPng'
+import { genresOf } from '../../lib/filter'
 import { RATING_VALUES, ratingText, stars } from '../../lib/ratings'
 import { groupFilms, memberColor, type GroupFilm } from '../../lib/room/group'
 import { decideWinner, eligibleGroupFilms, matchKey, voteCounts } from '../../lib/room/groupTournament'
@@ -14,6 +15,7 @@ import {
   pickBracketSize,
   roundName,
   seedFilms,
+  standingsToTiers,
   type SelectionMode,
   type Tournament,
 } from '../../lib/tournament'
@@ -21,6 +23,7 @@ import { onlineMemberIds, useRoom } from '../../store/useRoom'
 import { useStore } from '../../store/useStore'
 import {
   BracketSizeSelect,
+  GenreSelect,
   MatchHeader,
   MatchupCard,
   SeedPreview,
@@ -54,6 +57,8 @@ function Setup({ films }: { films: GroupFilm[] }) {
   const [mode, setMode] = useState<SelectionMode>('top')
   const [requested, setRequested] = useState(16)
   const [shuffleKey, setShuffleKey] = useState(0)
+  const [genre, setGenre] = useState(0)
+  const matches = useStore((s) => s.matches)
 
   // "Everyone" follows the member count as people join.
   const [lastSharing, setLastSharing] = useState(sharing)
@@ -62,7 +67,8 @@ function Setup({ films }: { films: GroupFilm[] }) {
     if (minWatchers === lastSharing || minWatchers > sharing) setMinWatchers(Math.max(1, sharing))
   }
 
-  const eligible = useMemo(() => eligibleGroupFilms(films, { minWatchers, minMedian }), [films, minWatchers, minMedian])
+  const qualifying = useMemo(() => eligibleGroupFilms(films, { minWatchers, minMedian }), [films, minWatchers, minMedian])
+  const eligible = useMemo(() => (genre ? qualifying.filter((f) => genresOf(matches[f.id])?.includes(genre)) : qualifying), [qualifying, genre, matches])
   const options = useMemo(() => bracketSizeOptions(eligible.length), [eligible.length])
   const count = pickBracketSize(options, requested)
   // shuffleKey forces a new random draw / tie-break order.
@@ -87,7 +93,7 @@ function Setup({ films }: { films: GroupFilm[] }) {
         <p className="rounded-xl bg-panel p-5 text-sm text-muted">Someone needs to share their films first.</p>
       ) : (
         <>
-          <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-muted">
               Films seen by
               <select value={minWatchers} onChange={(e) => setMinWatchers(Number(e.target.value))} className={inputClass}>
@@ -110,6 +116,7 @@ function Setup({ films }: { films: GroupFilm[] }) {
               </select>
             </label>
             <SelectionModeSelect value={mode} onChange={setMode} topLabel="Highest median" />
+            <GenreSelect films={qualifying} value={genre} onChange={setGenre} />
             <BracketSizeSelect value={count} options={options} onChange={setRequested} />
           </div>
           <SeedPreview
@@ -309,6 +316,15 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
         <>
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>
             {exporting ? 'Rendering…' : 'Download image'}
+          </Button>
+          <Button
+            onClick={() => {
+              if (!confirm('Place these films on the group board by how far they got? This changes the board for everyone.')) return
+              dispatch({ t: 'board', tiers: standingsToTiers(bracket, view.state.board) })
+              notify({ kind: 'success', text: 'Results sent to the group board.' })
+            }}
+          >
+            → Send to group board
           </Button>
           {view.isHost && (
             <>

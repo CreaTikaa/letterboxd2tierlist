@@ -10,9 +10,10 @@ import type { Member, Op, RoomState } from './types'
  *   with `state.version`, and sends a snapshot to anyone who joins.
  * - Others send their ops to the host (and apply them locally right away). The host applies and
  *   broadcasts each op; followers apply ops in version order and ask for a snapshot on any gap.
- * - A peer that is alone hosts. When two hosts meet, the one with the newer state wins (then the
- *   smaller member id, then peer id) and the other becomes a follower. This also lets anyone
- *   revive a room from their saved copy.
+ * - A peer that is alone hosts. When two hosts meet, an anchored copy (the creator's, or one that
+ *   came from the room) beats a fresh one; then the newer state wins (then the smaller member id,
+ *   then peer id) and the other becomes a follower. This also lets anyone revive a room from
+ *   their saved copy.
  * - When the host leaves, the connected peer with the smallest member id takes over.
  */
 
@@ -20,6 +21,7 @@ interface Hello {
   memberId: string
   name: string
   isHost: boolean
+  anchored: boolean
   version: number
 }
 
@@ -54,14 +56,24 @@ export interface SessionOptions {
   memberId: string
   name: string
   initialState?: RoomState | null
+  /** Starting a brand-new room (the creator): the fresh copy is anchored from the start. */
+  creating?: boolean
   onChange: (view: SessionView) => void
   /** Poster matches to hand to newcomers along with the room. */
   getMatches: (filmIds: string[]) => Record<string, Match>
   onMatches: (matches: Record<string, Match>) => void
 }
 
+interface Rank {
+  anchored: boolean
+  version: number
+  memberId: string
+  peerId: string
+}
+
 /** Total order used to decide which host wins and who takes over. */
-function outranks(a: { version: number; memberId: string; peerId: string }, b: { version: number; memberId: string; peerId: string }): boolean {
+function outranks(a: Rank, b: Rank): boolean {
+  if (a.anchored !== b.anchored) return a.anchored
   if (a.version !== b.version) return a.version > b.version
   if (a.memberId !== b.memberId) return a.memberId < b.memberId
   return a.peerId < b.peerId
@@ -88,7 +100,7 @@ export class RoomSession {
   constructor(transport: Transport, options: SessionOptions) {
     this.transport = transport
     this.options = options
-    this.state = options.initialState ? normalizeRoomState(options.initialState) : emptyRoomState(options.roomId)
+    this.state = options.initialState ? normalizeRoomState(options.initialState) : emptyRoomState(options.roomId, options.creating)
     this.ownMember = this.state.members[options.memberId] ?? null
 
     this.hello = transport.channel<Hello>('hello')
@@ -141,11 +153,12 @@ export class RoomSession {
   }
 
   private ownHello(): Hello {
-    return { memberId: this.options.memberId, name: this.options.name, isHost: this.isHost, version: this.state.version }
+    return { memberId: this.options.memberId, name: this.options.name, isHost: this.isHost, anchored: this.state.anchored, version: this.state.version }
   }
 
-  private rank(hello: Hello, peerId: string) {
-    return { version: hello.version, memberId: hello.memberId, peerId }
+  private rank(hello: Hello, peerId: string): Rank {
+    // Peers running an older version don't send `anchored`; their copies were always real rooms.
+    return { anchored: hello.anchored ?? true, version: hello.version, memberId: hello.memberId, peerId }
   }
 
   private selfRank() {
@@ -245,7 +258,7 @@ export class RoomSession {
 
   private electNewHost() {
     const candidates = [{ memberId: this.options.memberId, peerId: this.transport.selfId }, ...[...this.peers].map(([peerId, h]) => ({ memberId: h.memberId, peerId }))]
-    const winner = candidates.reduce((a, b) => (outranks({ version: 0, ...b }, { version: 0, ...a }) ? b : a))
+    const winner = candidates.reduce((a, b) => (outranks({ anchored: true, version: 0, ...b }, { anchored: true, version: 0, ...a }) ? b : a))
     if (winner.peerId !== this.transport.selfId) return
     this.isHost = true
     this.synced = true

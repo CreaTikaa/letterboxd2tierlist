@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultTiers } from '../tiers'
 import type { Film, Tier } from '../types'
-import { groupFilms, pickShowdownFilms, showdownResults } from './group'
+import { anonymousOrder, groupFilms, guessResults, listLabel, pickShowdownFilms, showdownResults } from './group'
 import { applyOp, emptyRoomState, emptyShowdown } from './reducer'
 import type { Member } from './types'
 
@@ -68,18 +68,59 @@ describe('showdownResults', () => {
   })
 })
 
+describe('guess whose list', () => {
+  const boards = { ann: defaultTiers(), bob: defaultTiers(), cat: defaultTiers() }
+
+  it('orders lists the same way for everyone, differently per round', () => {
+    const order = anonymousOrder({ ...emptyShowdown(), round: 3, boards })
+    expect([...order].sort()).toEqual(['ann', 'bob', 'cat'])
+    expect(anonymousOrder({ ...emptyShowdown(), round: 3, boards: { cat: boards.cat, ann: boards.ann, bob: boards.bob } })).toEqual(order)
+    const orders = new Set(Array.from({ length: 10 }, (_, round) => anonymousOrder({ ...emptyShowdown(), round, boards }).join()))
+    expect(orders.size).toBeGreaterThan(1)
+    expect(listLabel(0)).toBe('List A')
+  })
+
+  it('scores guesses, ignoring guesses about your own list', () => {
+    const showdown = {
+      ...emptyShowdown(),
+      boards,
+      guesses: {
+        ann: { bob: 'bob', cat: 'bob' },
+        bob: { ann: 'ann', cat: 'cat', bob: 'bob' },
+        cat: { ann: 'bob' },
+      },
+    }
+    const { detectives, recognised } = guessResults(showdown)
+    expect(detectives).toEqual([
+      { memberId: 'bob', correct: 2, total: 2 },
+      { memberId: 'ann', correct: 1, total: 2 },
+      { memberId: 'cat', correct: 0, total: 2 },
+    ])
+    expect(recognised.find((r) => r.ownerId === 'ann')).toEqual({ ownerId: 'ann', correct: 1, guessers: 2 })
+    expect(recognised.find((r) => r.ownerId === 'cat')).toEqual({ ownerId: 'cat', correct: 1, guessers: 2 })
+  })
+
+  it('sets and clears a guess', () => {
+    let state = applyOp(emptyRoomState('r'), { t: 'sd-guess', memberId: 'ann', ownerId: 'x', guessId: 'bob' })
+    expect(state.showdown.guesses).toEqual({ ann: { x: 'bob' } })
+    state = applyOp(state, { t: 'sd-guess', memberId: 'ann', ownerId: 'x', guessId: null })
+    expect(state.showdown.guesses).toEqual({ ann: {} })
+  })
+})
+
 describe('applyOp', () => {
   it('starts a showdown with a clean slate and handles lock/unlock and votes', () => {
     let state = emptyRoomState('r')
-    state = applyOp(state, { t: 'sd-start', round: 1, filmIds: ['x'], tiers: defaultTiers() })
+    state = applyOp(state, { t: 'sd-start', round: 1, filmIds: ['x'], tiers: defaultTiers(), mode: 'classic' })
     expect(state.showdown.phase).toBe('ranking')
     state = applyOp(state, { t: 'sd-lock', memberId: 'a', tiers: defaultTiers() })
     expect(Object.keys(state.showdown.boards)).toEqual(['a'])
     state = applyOp(state, { t: 'sd-lock', memberId: 'a', tiers: null })
     expect(state.showdown.boards).toEqual({})
     state = applyOp(state, { t: 'sd-vote', memberId: 'a', best: 'b', worst: null })
-    state = applyOp(state, { t: 'sd-start', round: 2, filmIds: [], tiers: [] })
+    state = applyOp(state, { t: 'sd-start', round: 2, filmIds: [], tiers: [], mode: 'guess' })
     expect(state.showdown.votes).toEqual({})
+    expect(state.showdown.mode).toBe('guess')
   })
 
   it('adds and removes members', () => {

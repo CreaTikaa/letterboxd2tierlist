@@ -1,5 +1,5 @@
 import { shuffle } from './random'
-import type { Film } from './types'
+import type { Film, Tier } from './types'
 
 /**
  * Single-elimination bracket. `seeds[0]` is seed #1. Rounds are played in order; byes (when the
@@ -180,4 +180,19 @@ export function bracketSizeOptions(available: number): number[] {
 /** The requested size if offered, else the largest option up to 16. */
 export function pickBracketSize(options: number[], requested: number): number {
   return options.includes(requested) ? requested : (options.filter((n) => n <= 16).at(-1) ?? options[0] ?? 0)
+}
+
+/**
+ * Places the tournament's films on a tier board by how far they got: champion in the first tier,
+ * runner-up in the second, semi-finalists in the third… and everyone else in the last tier.
+ * Other films on the board keep their spots.
+ */
+export function standingsToTiers(t: Tournament, tiers: Tier[]): Tier[] {
+  if (tiers.length === 0) return tiers
+  const table = standings(t)
+  const places = [...new Set(table.map((s) => s.place))].sort((a, b) => a - b)
+  const inTournament = new Set(table.map((s) => s.filmId))
+  const result = tiers.map((tier) => ({ ...tier, filmIds: tier.filmIds.filter((id) => !inTournament.has(id)) }))
+  for (const { filmId, place } of table) result[Math.min(places.indexOf(place), tiers.length - 1)].filmIds.push(filmId)
+  return result
 }

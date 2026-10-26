@@ -3,15 +3,22 @@ import { defaultTiers } from '../tiers'
 import { currentMatchKey, emptyRoomTournament, matchKey } from './groupTournament'
 import type { Op, RoomState, RoomTournament, Showdown } from './types'
 
-export const emptyShowdown = (): Showdown => ({ phase: 'idle', round: 0, filmIds: [], tiers: [], boards: {}, votes: {} })
+export const emptyShowdown = (): Showdown => ({ phase: 'idle', mode: 'classic', round: 0, filmIds: [], tiers: [], boards: {}, votes: {}, guesses: {} })
 
-export function emptyRoomState(id: string): RoomState {
-  return { id, version: 0, members: {}, board: defaultTiers(), showdown: emptyShowdown(), tournament: emptyRoomTournament() }
+export function emptyRoomState(id: string, anchored = false): RoomState {
+  return { id, anchored, version: 0, members: {}, board: defaultTiers(), showdown: emptyShowdown(), tournament: emptyRoomTournament() }
 }
 
 /** Fills in fields added after a room was saved (rooms are kept in browsers indefinitely). */
 export function normalizeRoomState(state: RoomState): RoomState {
-  return { ...emptyRoomState(state.id), ...state, tournament: state.tournament ?? emptyRoomTournament() }
+  return {
+    ...emptyRoomState(state.id),
+    ...state,
+    // Copies saved before anchoring existed are real rooms.
+    anchored: state.anchored ?? true,
+    showdown: { ...emptyShowdown(), ...state.showdown },
+    tournament: state.tournament ?? emptyRoomTournament(),
+  }
 }
 
 function applyTournamentOp(tournament: RoomTournament, op: Op): RoomTournament {
@@ -61,7 +68,7 @@ export function applyOp(state: RoomState, op: Op): RoomState {
     case 'sd-start':
       return {
         ...state,
-        showdown: { phase: 'ranking', round: op.round, filmIds: op.filmIds, tiers: op.tiers, boards: {}, votes: {} },
+        showdown: { phase: 'ranking', mode: op.mode, round: op.round, filmIds: op.filmIds, tiers: op.tiers, boards: {}, votes: {}, guesses: {} },
       }
     case 'sd-lock': {
       const { [op.memberId]: _old, ...boards } = state.showdown.boards
@@ -71,6 +78,11 @@ export function applyOp(state: RoomState, op: Op): RoomState {
       return { ...state, showdown: { ...state.showdown, phase: op.phase } }
     case 'sd-vote':
       return { ...state, showdown: { ...state.showdown, votes: { ...state.showdown.votes, [op.memberId]: { best: op.best, worst: op.worst } } } }
+    case 'sd-guess': {
+      const { [op.ownerId]: _old, ...mine } = state.showdown.guesses[op.memberId] ?? {}
+      const guesses = { ...state.showdown.guesses, [op.memberId]: op.guessId ? { ...mine, [op.ownerId]: op.guessId } : mine }
+      return { ...state, showdown: { ...state.showdown, guesses } }
+    }
     case 'tn-start':
     case 'tn-vote':
     case 'tn-resolve':

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ImportPanel } from '../components/ImportPanel'
 import {
   BracketSizeSelect,
+  GenreSelect,
   MatchHeader,
   MatchupCard,
   SeedPreview,
@@ -12,6 +13,7 @@ import { useSeedLookup } from '../components/tournament/useSeedLookup'
 import { Button, inputClass } from '../components/ui'
 import { dateStamp, downloadBlob } from '../lib/download'
 import { renderTournamentPng } from '../lib/export/tournamentPng'
+import { genresOf } from '../lib/filter'
 import { RATING_VALUES, stars } from '../lib/ratings'
 import {
   MIN_ENTRANTS,
@@ -22,11 +24,13 @@ import {
   pick,
   pickBracketSize,
   seedFilms,
+  standingsToTiers,
   undo,
   type SelectionMode,
   type Tournament,
 } from '../lib/tournament'
 import type { Film } from '../lib/types'
+import { navigate } from '../router'
 import { useStore } from '../store/useStore'
 
 export function TournamentPage() {
@@ -41,13 +45,16 @@ export function TournamentPage() {
 
 function Setup({ films }: { films: Film[] }) {
   const setTournament = useStore((s) => s.setTournament)
+  const matches = useStore((s) => s.matches)
+  const [genre, setGenre] = useState(0)
   const [minRating, setMinRating] = useState(0)
   const [includeUnrated, setIncludeUnrated] = useState(false)
   const [mode, setMode] = useState<SelectionMode>('top')
   const [requested, setRequested] = useState(16)
   const [shuffleKey, setShuffleKey] = useState(0)
 
-  const eligible = useMemo(() => films.filter((f) => (f.rating == null ? includeUnrated : f.rating >= minRating)), [films, minRating, includeUnrated])
+  const rated = useMemo(() => films.filter((f) => (f.rating == null ? includeUnrated : f.rating >= minRating)), [films, minRating, includeUnrated])
+  const eligible = useMemo(() => (genre ? rated.filter((f) => genresOf(matches[f.id])?.includes(genre)) : rated), [rated, genre, matches])
   const options = useMemo(() => bracketSizeOptions(eligible.length), [eligible.length])
   const count = pickBracketSize(options, requested)
 
@@ -71,7 +78,7 @@ function Setup({ films }: { films: Film[] }) {
         </p>
       </div>
 
-      <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-muted">
           Minimum rating
           <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className={inputClass}>
@@ -84,6 +91,7 @@ function Setup({ films }: { films: Film[] }) {
           </select>
         </label>
         <SelectionModeSelect value={mode} onChange={setMode} topLabel="My top-rated" />
+        <GenreSelect films={rated} value={genre} onChange={setGenre} />
         <BracketSizeSelect value={count} options={options} onChange={setRequested} />
         <label className="flex items-center gap-2 self-end pb-2 text-muted">
           <input type="checkbox" checked={includeUnrated} onChange={(e) => setIncludeUnrated(e.target.checked)} className="accent-lb-green" />
@@ -157,6 +165,7 @@ function MatchView({ tournament: t }: { tournament: Tournament }) {
 function Results({ tournament: t }: { tournament: Tournament }) {
   const matches = useStore((s) => s.matches)
   const setTournament = useStore((s) => s.setTournament)
+  const setTiers = useStore((s) => s.setTiers)
   const notify = useStore((s) => s.notify)
   const [exporting, setExporting] = useState(false)
 
@@ -178,6 +187,16 @@ function Results({ tournament: t }: { tournament: Tournament }) {
         <>
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>
             {exporting ? 'Rendering…' : 'Download image'}
+          </Button>
+          <Button
+            onClick={() => {
+              if (!confirm("Place these films on your tier board by how far they got? Films already on the board move to their new tier.")) return
+              setTiers(standingsToTiers(t, useStore.getState().tiers))
+              notify({ kind: 'success', text: `Placed ${t.seeds.length} films on your tier list: champion in the top tier.` })
+              navigate({ page: 'tierlist' })
+            }}
+          >
+            → Send to my tier list
           </Button>
           <Button onClick={() => setTournament(createTournament(t.seeds))}>Replay same films</Button>
           <Button variant="ghost" onClick={() => setTournament(undo(t))}>

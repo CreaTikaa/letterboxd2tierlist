@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { countByRating } from '../lib/filter'
+import { countByGenre, countByRating } from '../lib/filter'
+import { genreName } from '../lib/genres'
 import { RATING_VALUES, stars } from '../lib/ratings'
-import type { Film, Filters } from '../lib/types'
+import type { Film, Filters, Match } from '../lib/types'
 import { useStore } from '../store/useStore'
 import { Button, inputClass } from './ui'
 
@@ -14,6 +15,22 @@ function Chip({ active, onClick, children, title }: { active: boolean; onClick: 
       aria-pressed={active}
       className={`rounded-full border px-2.5 py-1 text-xs whitespace-nowrap transition ${
         active ? 'border-lb-green/60 bg-lb-green/15 text-text' : 'border-line text-muted/70 line-through decoration-muted/50 hover:text-muted'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Genre chips start "off" (no strike-through) since an empty selection means every genre. */
+function GenreChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full border px-2.5 py-1 text-xs whitespace-nowrap transition ${
+        active ? 'border-lb-blue/60 bg-lb-blue/15 text-text' : 'border-line text-muted hover:text-text'
       }`}
     >
       {children}
@@ -56,15 +73,21 @@ interface Props {
   ratingLabel?: string
   /** Extra controls on the second row. */
   extra?: ReactNode
+  /** Poster matches, which carry genres; without them the genre row is hidden. */
+  matches?: Record<string, Match>
 }
 
-export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel = 'Ratings', extra }: Props) {
+export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel = 'Ratings', extra, matches }: Props) {
   const cardWidth = useStore((s) => s.cardWidth)
   const setCardWidth = useStore((s) => s.setCardWidth)
   const showRatings = useStore((s) => s.showRatings)
   const setShowRatings = useStore((s) => s.setShowRatings)
   const counts = useMemo(() => countByRating(films), [films])
+  const genreCounts = useMemo(() => (matches ? [...countByGenre(films, matches)].sort((a, b) => b[1] - a[1]) : []), [films, matches])
   const selected = new Set(filters.ratings)
+  const selectedGenres = new Set(filters.genres ?? [])
+  const toggleGenre = (genre: number) =>
+    setFilters({ genres: selectedGenres.has(genre) ? [...selectedGenres].filter((g) => g !== genre) : [...selectedGenres, genre] })
 
   const toggleRating = (rating: number) =>
     setFilters({ ratings: selected.has(rating) ? filters.ratings.filter((r) => r !== rating) : [...filters.ratings, rating] })
@@ -97,6 +120,20 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
           </Button>
         ))}
       </div>
+
+      {genreCounts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">Genres</span>
+          <GenreChip active={selectedGenres.size === 0} onClick={() => setFilters({ genres: [] })}>
+            Any
+          </GenreChip>
+          {genreCounts.map(([genre, count]) => (
+            <GenreChip key={genre} active={selectedGenres.has(genre)} onClick={() => toggleGenre(genre)}>
+              {genreName(genre)} <span className="text-muted">{count}</span>
+            </GenreChip>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <input

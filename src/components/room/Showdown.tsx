@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { groupFilms, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
-import type { Showdown as ShowdownState } from '../../lib/room/types'
+import { anonymousOrder, groupFilms, guessResults, listLabel, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
+import type { ShowdownMode, Showdown as ShowdownState } from '../../lib/room/types'
 import { autoFill, clearTiers, defaultRatingMap, placedIds } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
 import { useRoom, useShowdownDrafts } from '../../store/useRoom'
@@ -40,11 +40,12 @@ function Setup({ films }: { films: GroupFilm[] }) {
   const [minWatchers, setMinWatchers] = useState(Math.max(1, sharing))
   const [count, setCount] = useState(20)
   const [mode, setMode] = useState<'popular' | 'random'>('popular')
+  const [showdownMode, setShowdownMode] = useState<ShowdownMode>('classic')
   const available = useMemo(() => films.filter((f) => f.watchers.length >= minWatchers).length, [films, minWatchers])
 
   const start = () => {
     const filmIds = pickShowdownFilms(films, { minWatchers, count, mode })
-    dispatch({ t: 'sd-start', round: view.state.showdown.round + 1, filmIds, tiers: clearTiers(view.state.board) })
+    dispatch({ t: 'sd-start', round: view.state.showdown.round + 1, filmIds, tiers: clearTiers(view.state.board), mode: showdownMode })
   }
 
   return (
@@ -57,6 +58,10 @@ function Setup({ films }: { films: GroupFilm[] }) {
           <li>Everyone votes for the best and the worst list (not their own).</li>
           <li>See who won, and which films split the room.</li>
         </ol>
+        <p className="text-sm text-muted">
+          <span className="font-semibold text-text">Guess whose list:</span> the lists are revealed without names, and everyone also guesses who made each one.
+          Names are revealed with the results, along with who guessed best.
+        </p>
       </div>
 
       <div className="space-y-4 rounded-xl bg-panel p-5">
@@ -67,7 +72,14 @@ function Setup({ films }: { films: GroupFilm[] }) {
               <p className="text-sm text-muted">Someone needs to share their films first.</p>
             ) : (
               <>
-                <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-muted">
+                    Mode
+                    <select value={showdownMode} onChange={(e) => setShowdownMode(e.target.value as ShowdownMode)} className={inputClass}>
+                      <option value="classic">Classic (names shown)</option>
+                      <option value="guess">Guess whose list (anonymous)</option>
+                    </select>
+                  </label>
                   <label className="flex flex-col gap-1 text-muted">
                     Films seen by at least
                     <select value={minWatchers} onChange={(e) => setMinWatchers(Number(e.target.value))} className={inputClass}>
@@ -204,28 +216,34 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
 
 function BoardCard({
   memberId,
+  title,
   tiers,
   filmById,
   matches,
   children,
+  footer,
   highlight,
 }: {
   memberId: string
+  /** Replaces the member's name (e.g. "List B" in guess mode). */
+  title?: ReactNode
   tiers: Tier[]
   filmById: Map<string, GroupFilm>
   matches: Record<string, Match>
   children?: ReactNode
+  footer?: ReactNode
   highlight?: 'best' | 'worst'
 }) {
   const setEditingFilm = useStore((s) => s.setEditingFilm)
   const ring = highlight === 'best' ? 'ring-2 ring-lb-green' : highlight === 'worst' ? 'ring-2 ring-red-500' : ''
   return (
     <div className={`space-y-2 rounded-xl bg-panel p-3 ${ring}`}>
-      <div className="flex items-center justify-between gap-2">
-        <MemberTag memberId={memberId} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {title ?? <MemberTag memberId={memberId} />}
         {children}
       </div>
       <StaticTierList tiers={tiers} filmById={filmById} matches={matches} onFilmClick={setEditingFilm} />
+      {footer}
     </div>
   )
 }
@@ -235,9 +253,15 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
   const dispatch = useRoom((s) => s.dispatch)
   const me = useStore((s) => s.profile.memberId)
   const matches = useStore((s) => s.matches)
+  const nameOf = useNameOf()
   const vote = showdown.votes[me] ?? { best: null, worst: null }
   const voters = Object.keys(showdown.votes).length
   const online = 1 + Object.keys(view.peers).length
+  const guessing = showdown.mode === 'guess'
+  const owners = guessing ? anonymousOrder(showdown) : Object.keys(showdown.boards)
+  const myGuesses = showdown.guesses[me] ?? {}
+  const others = owners.filter((id) => id !== me)
+  const doneGuessing = Object.entries(showdown.guesses).filter(([guesser, g]) => owners.every((o) => o === guesser || g[o])).length
 
   const castVote = (kind: 'best' | 'worst', memberId: string) => {
     const next = { ...vote, [kind]: vote[kind] === memberId ? null : memberId }
@@ -251,9 +275,10 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-panel p-4 text-sm">
         <p>
-          <span className="font-semibold">The lists are in!</span> Vote for the best 👑 and the worst 💀 list.{' '}
+          <span className="font-semibold">The lists are in!</span>{' '}
+          {guessing ? 'Guess who made each list, and vote for the best 👑 and the worst 💀.' : 'Vote for the best 👑 and the worst 💀 list.'}{' '}
           <span className="text-muted">
-            {voters} of {online} voted.
+            {voters} of {online} voted{guessing && ` · ${doneGuessing} finished guessing`}.
           </span>
         </p>
         {view.isHost && (
@@ -263,14 +288,35 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
         )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {Object.entries(showdown.boards).map(([memberId, tiers]) => (
+        {owners.map((memberId, index) => (
           <BoardCard
             key={memberId}
             memberId={memberId}
-            tiers={tiers}
+            title={guessing ? <span className="font-semibold">{listLabel(index)}{memberId === me && <span className="font-normal text-muted"> (yours)</span>}</span> : undefined}
+            tiers={showdown.boards[memberId]}
             filmById={filmById}
             matches={matches}
             highlight={vote.best === memberId ? 'best' : vote.worst === memberId ? 'worst' : undefined}
+            footer={
+              guessing &&
+              memberId !== me && (
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  Who made this?
+                  <select
+                    value={myGuesses[memberId] ?? ''}
+                    onChange={(e) => dispatch({ t: 'sd-guess', memberId: me, ownerId: memberId, guessId: e.target.value || null })}
+                    className={`${inputClass} flex-1`}
+                  >
+                    <option value="">Pick someone…</option>
+                    {others.map((id) => (
+                      <option key={id} value={id}>
+                        {nameOf(id)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
+            }
           >
             {memberId === me ? (
               <span className="text-xs text-muted">your list</span>
@@ -298,6 +344,9 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
   const setEditingFilm = useStore((s) => s.setEditingFilm)
   const nameOf = useNameOf()
   const results = useMemo(() => showdownResults(showdown), [showdown])
+  const guessing = showdown.mode === 'guess'
+  const guesses = useMemo(() => (guessing ? guessResults(showdown) : null), [guessing, showdown])
+  const order = guessing ? anonymousOrder(showdown) : Object.keys(showdown.boards)
   const topBest = results.best.filter((b) => b.votes === results.best[0]?.votes)
   const topWorst = results.worst.filter((w) => w.votes === results.worst[0]?.votes)
   const boards = Object.entries(showdown.boards)
@@ -318,6 +367,31 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
           {topWorst[0] && <p className="text-sm text-muted">{plural(topWorst[0].votes, 'vote')}</p>}
         </div>
       </div>
+
+      {guesses && guesses.detectives.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 rounded-xl bg-panel p-4">
+            <h3 className="font-semibold">🕵️ Best detectives</h3>
+            {guesses.detectives.map(({ memberId, correct, total }) => (
+              <p key={memberId} className="flex items-center justify-between text-sm">
+                <MemberTag memberId={memberId} suffix={correct > 0 && correct === guesses.detectives[0].correct ? '🏅' : undefined} />
+                <span className="text-muted">
+                  {correct} / {total} right
+                </span>
+              </p>
+            ))}
+          </div>
+          <div className="space-y-2 rounded-xl bg-panel p-4">
+            <h3 className="font-semibold">🎭 Easiest list to recognise</h3>
+            {guesses.recognised.map(({ ownerId, correct, guessers }) => (
+              <p key={ownerId} className="flex items-center justify-between text-sm">
+                <MemberTag memberId={ownerId} />
+                <span className="text-muted">{guessers ? `${correct} of ${guessers} guessed it` : 'no guesses'}</span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {results.controversial.length > 0 && (
         <div className="space-y-2">
@@ -355,14 +429,35 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {boards.map(([memberId, tiers]) => {
+        {order.map((memberId, index) => {
           const best = results.best.find((b) => b.memberId === memberId)?.votes ?? 0
           const worst = results.worst.find((w) => w.memberId === memberId)?.votes ?? 0
+          const about = Object.entries(showdown.guesses).filter(([guesser, g]) => guesser !== memberId && g[memberId])
           return (
             <BoardCard
               key={memberId}
               memberId={memberId}
-              tiers={tiers}
+              title={
+                guessing ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-muted">{listLabel(index)} was</span> <MemberTag memberId={memberId} />
+                  </span>
+                ) : undefined
+              }
+              footer={
+                guessing &&
+                about.length > 0 && (
+                  <p className="text-xs text-muted">
+                    {about.map(([guesser, g], i) => (
+                      <span key={guesser}>
+                        {i > 0 && ' · '}
+                        {nameOf(guesser)} {g[memberId] === memberId ? <span className="text-lb-green">✓</span> : <span className="text-red-400">✗ ({nameOf(g[memberId])})</span>}
+                      </span>
+                    ))}
+                  </p>
+                )
+              }
+              tiers={showdown.boards[memberId]}
               filmById={filmById}
               matches={matches}
               highlight={topBest.some((b) => b.memberId === memberId) ? 'best' : topWorst.some((w) => w.memberId === memberId) ? 'worst' : undefined}

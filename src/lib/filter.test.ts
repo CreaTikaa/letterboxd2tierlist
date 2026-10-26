@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_FILTERS, filterFilms, sortFilms } from './filter'
-import type { Film } from './types'
+import { DEFAULT_FILTERS, countByGenre, filterFilms, sortFilms } from './filter'
+import type { Film, Match } from './types'
 
 const film = (name: string, rating: number | null, year: number | null = 2000, watchedDate: string | null = null): Film => ({
   id: name,
@@ -30,6 +30,27 @@ describe('filterFilms', () => {
   it('filters by title search and year range', () => {
     expect(filterFilms(FILMS, { ...DEFAULT_FILTERS, search: 'ALI' }).map((f) => f.name)).toEqual(['Alien'])
     expect(filterFilms(FILMS, { ...DEFAULT_FILTERS, yearMin: 1980, yearMax: 2020 }).map((f) => f.name)).toEqual(['Brazil', 'Cats'])
+  })
+})
+
+describe('genre filter', () => {
+  const matched = (genreIds?: number[]): Match => ({ status: 'matched', tmdbId: 1, title: '', year: null, posterPath: null, genreIds })
+  const matches: Record<string, Match> = { Alien: matched([27, 878]), Brazil: matched([878, 35]), Cats: matched([10402]), Dune: matched() }
+
+  it('keeps films with any selected genre and drops films without genre data', () => {
+    const names = (genres: number[]) => filterFilms(FILMS, { ...DEFAULT_FILTERS, genres }, matches).map((f) => f.name)
+    expect(names([878])).toEqual(['Alien', 'Brazil'])
+    expect(names([27, 10402])).toEqual(['Alien', 'Cats'])
+    expect(names([])).toHaveLength(4)
+  })
+
+  it('treats saved filters without a genres field as "all genres"', () => {
+    const { genres: _g, ...old } = DEFAULT_FILTERS
+    expect(filterFilms(FILMS, old as typeof DEFAULT_FILTERS, matches)).toHaveLength(4)
+  })
+
+  it('counts films per genre', () => {
+    expect(Object.fromEntries(countByGenre(FILMS, matches))).toEqual({ 27: 1, 878: 2, 35: 1, 10402: 1 })
   })
 })
 
