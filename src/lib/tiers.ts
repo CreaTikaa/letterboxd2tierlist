@@ -42,3 +42,26 @@ export function autoFill(tiers: Tier[], films: Film[], map: RatingMap): Tier[] {
 export function placedIds(tiers: Tier[]): Set<string> {
   return new Set(tiers.flatMap((t) => t.filmIds))
 }
+
+export function addTier(tiers: Tier[]): Tier[] {
+  return [...tiers, { id: newTierId(), label: 'New', color: TIER_COLORS[tiers.length % TIER_COLORS.length], filmIds: [] }]
+}
+
+export function updateTier(tiers: Tier[], id: string, changes: Partial<Omit<Tier, 'id'>>): Tier[] {
+  return tiers.map((t) => (t.id === id ? { ...t, ...changes } : t))
+}
+
+export function removeTier(tiers: Tier[], id: string): Tier[] {
+  return tiers.filter((t) => t.id !== id)
+}
+
+export function moveTier(tiers: Tier[], id: string, offset: -1 | 1): Tier[] {
+  const from = tiers.findIndex((t) => t.id === id)
+  const to = from + offset
+  if (from < 0 || to < 0 || to >= tiers.length) return tiers
+  const result = [...tiers]
+  ;[result[from], result[to]] = [result[to], result[from]]
+  return result
+}
+
+export const clearTiers = (tiers: Tier[]): Tier[] => tiers.map((t) => ({ ...t, filmIds: [] }))

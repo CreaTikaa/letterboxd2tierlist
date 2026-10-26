@@ -1,23 +1,29 @@
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { stars } from '../../lib/ratings'
 import { posterUrl } from '../../lib/tmdb/client'
 import type { Film, Match } from '../../lib/types'
-import { useStore } from '../../store/useStore'
 
-interface CardProps {
-  film: Film
-  match: Match | undefined
+export interface CardOptions {
   width: number
   showRating: boolean
+  /** Replaces the star rating strip at the bottom of the card. */
+  badge?: (film: Film) => ReactNode
+  onClick?: (film: Film) => void
+}
+
+interface CardProps extends Omit<CardOptions, 'onClick'> {
+  film: Film
+  match: Match | undefined
   lifted?: boolean
 }
 
-export function PosterCard({ film, match, width, showRating, lifted = false }: CardProps) {
+export function PosterCard({ film, match, width, showRating, badge, lifted = false }: CardProps) {
   const poster = match?.status === 'matched' && match.posterPath ? posterUrl(match.posterPath, width > 92 ? 'w185' : 'w154') : null
   const label = `${film.name}${film.year ? ` (${film.year})` : ''} · ${stars(film.rating)}`
+  const strip = badge ? badge(film) : film.rating != null ? stars(film.rating) : null
 
   return (
     <div
@@ -35,12 +41,9 @@ export function PosterCard({ film, match, width, showRating, lifted = false }: C
           {film.year && <span className="text-muted" style={{ fontSize: Math.max(8, width / 10) }}>{film.year}</span>}
         </div>
       )}
-      {showRating && film.rating != null && (
-        <span
-          className="absolute inset-x-0 bottom-0 bg-black/75 text-center leading-snug text-lb-green"
-          style={{ fontSize: Math.max(9, width / 9) }}
-        >
-          {stars(film.rating)}
+      {showRating && strip != null && (
+        <span className="absolute inset-x-0 bottom-0 bg-black/75 text-center leading-snug text-lb-green" style={{ fontSize: Math.max(9, width / 9) }}>
+          {strip}
         </span>
       )}
     </div>
@@ -50,41 +53,40 @@ export function PosterCard({ film, match, width, showRating, lifted = false }: C
 interface ItemProps {
   film: Film
   match: Match | undefined
-  width: number
-  showRating: boolean
+  options: CardOptions
 }
 
 /** Card inside a tier row: sortable within and across tiers. */
-export const SortablePoster = memo(function SortablePoster({ film, ...props }: ItemProps) {
+export const SortablePoster = memo(function SortablePoster({ film, match, options }: ItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: film.id })
-  const setEditingFilm = useStore((s) => s.setEditingFilm)
+  const { onClick, ...cardOptions } = options
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`cursor-grab touch-manipulation active:cursor-grabbing ${isDragging ? 'opacity-30' : ''}`}
-      onClick={() => setEditingFilm(film.id)}
+      onClick={() => onClick?.(film)}
       {...attributes}
       {...listeners}
     >
-      <PosterCard film={film} {...props} />
+      <PosterCard film={film} match={match} {...cardOptions} />
     </div>
   )
 })
 
 /** Card in the unplaced pool: draggable only, since the pool's order comes from its sort setting. */
-export const PoolPoster = memo(function PoolPoster({ film, ...props }: ItemProps) {
+export const PoolPoster = memo(function PoolPoster({ film, match, options }: ItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: film.id })
-  const setEditingFilm = useStore((s) => s.setEditingFilm)
+  const { onClick, ...cardOptions } = options
   return (
     <div
       ref={setNodeRef}
       className={`cursor-grab touch-manipulation active:cursor-grabbing ${isDragging ? 'opacity-30' : ''}`}
-      onClick={() => setEditingFilm(film.id)}
+      onClick={() => onClick?.(film)}
       {...attributes}
       {...listeners}
     >
-      <PosterCard film={film} {...props} />
+      <PosterCard film={film} match={match} {...cardOptions} />
     </div>
   )
 })

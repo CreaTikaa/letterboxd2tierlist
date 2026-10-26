@@ -6,3 +6,9 @@ export function stars(rating: number | null): string {
 }
 
 export const ratingKey = (rating: number) => String(rating)
+
+/** Stars for half-star values, a number otherwise (medians can be e.g. 4.25). */
+export function ratingText(rating: number | null): string {
+  if (rating == null) return 'unrated'
+  return Number.isInteger(rating * 2) ? stars(rating) : `${rating.toFixed(2).replace(/0$/, '')}★`
+}

@@ -14,14 +14,14 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useMemo, useState } from 'react'
-import { useVisibleFilms } from '../../hooks'
+import { useMemo, useState, type ReactNode } from 'react'
 import { sortFilms } from '../../lib/filter'
-import { placedIds } from '../../lib/tiers'
+import { addTier, clearTiers, moveTier, placedIds, removeTier, updateTier } from '../../lib/tiers'
+import type { Film, Match, PoolSort, Tier } from '../../lib/types'
 import { useStore } from '../../store/useStore'
 import { Button } from '../ui'
 import { POOL_ID, Pool } from './Pool'
-import { PosterCard } from './PosterCard'
+import { PosterCard, type CardOptions } from './PosterCard'
 import { TierRow } from './TierRow'
 
 /** Visible film ids per container (each tier id, plus the pool). */
@@ -43,31 +43,40 @@ function makeCollisionDetection(containerIds: Set<string>): CollisionDetection {
   }
 }
 
-export function Board({ onAutoFill }: { onAutoFill: () => void }) {
-  const films = useStore((s) => s.films)
-  const matches = useStore((s) => s.matches)
-  const tiers = useStore((s) => s.tiers)
-  const poolSort = useStore((s) => s.poolSort)
+export interface BoardProps {
+  tiers: Tier[]
+  /** Films that pass the current filters; only these are shown. */
+  films: Film[]
+  matches: Record<string, Match>
+  onTiersChange: (tiers: Tier[]) => void
+  poolSort: PoolSort
+  onPoolSortChange: (sort: PoolSort) => void
+  onAutoFill?: () => void
+  onFilmClick?: (film: Film) => void
+  badge?: CardOptions['badge']
+  /** Extra toolbar buttons, shown after the built-in ones. */
+  toolbar?: ReactNode
+  hint?: string
+}
+
+export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSortChange, onAutoFill, onFilmClick, badge, toolbar, hint }: BoardProps) {
   const cardWidth = useStore((s) => s.cardWidth)
   const showRatings = useStore((s) => s.showRatings)
-  const setTiers = useStore((s) => s.setTiers)
-  const addTier = useStore((s) => s.addTier)
-  const clearBoard = useStore((s) => s.clearBoard)
-  const visible = useVisibleFilms()
+  const cardOptions = useMemo<CardOptions>(() => ({ width: cardWidth, showRating: showRatings, badge, onClick: onFilmClick }), [cardWidth, showRatings, badge, onFilmClick])
 
   const filmById = useMemo(() => new Map(films.map((f) => [f.id, f])), [films])
-  const visibleIds = useMemo(() => new Set(visible.map((f) => f.id)), [visible])
+  const visibleIds = useMemo(() => new Set(films.map((f) => f.id)), [films])
 
   const derived = useMemo<Containers>(() => {
     const placed = placedIds(tiers)
     const containers: Containers = {}
     for (const tier of tiers) containers[tier.id] = tier.filmIds.filter((id) => visibleIds.has(id))
     containers[POOL_ID] = sortFilms(
-      visible.filter((f) => !placed.has(f.id)),
+      films.filter((f) => !placed.has(f.id)),
       poolSort,
     ).map((f) => f.id)
     return containers
-  }, [tiers, visible, visibleIds, poolSort])
+  }, [tiers, films, visibleIds, poolSort])
 
   // While dragging, cross-container moves happen on this local copy; it's committed on drop.
   const [dragItems, setDragItems] = useState<Containers | null>(null)
@@ -83,11 +92,11 @@ export function Board({ onAutoFill }: { onAutoFill: () => void }) {
   )
 
   const commit = (containers: Containers) => {
-    setTiers(
+    onTiersChange(
       tiers.map((tier) => ({
         ...tier,
         // Films hidden by the current filters keep their spot at the end of the tier.
-        filmIds: [...containers[tier.id], ...tier.filmIds.filter((id) => !visibleIds.has(id))],
+        filmIds: [...(containers[tier.id] ?? []), ...tier.filmIds.filter((id) => !visibleIds.has(id))],
       })),
     )
   }
@@ -146,38 +155,49 @@ export function Board({ onAutoFill }: { onAutoFill: () => void }) {
   }
 
   const activeFilm = activeId ? filmById.get(activeId) : undefined
-  const placedCount = tiers.reduce((sum, tier) => sum + items[tier.id].length, 0)
+  const placedCount = tiers.reduce((sum, tier) => sum + (items[tier.id]?.length ?? 0), 0)
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={onAutoFill} title="Place every visible film in a tier based on its rating">
-            ★ Auto-fill by rating
-          </Button>
-          <Button onClick={addTier}>+ Add tier</Button>
-          <Button
-            variant="ghost"
-            disabled={placedCount === 0}
-            onClick={() => confirm('Move every film back to the unplaced pool?') && clearBoard()}
-          >
+          {onAutoFill && (
+            <Button variant="primary" onClick={onAutoFill} title="Place every visible film in a tier based on its rating">
+              ★ Auto-fill by rating
+            </Button>
+          )}
+          <Button onClick={() => onTiersChange(addTier(tiers))}>+ Add tier</Button>
+          <Button variant="ghost" disabled={placedCount === 0} onClick={() => confirm('Move every film back to the unplaced pool?') && onTiersChange(clearTiers(tiers))}>
             Clear board
           </Button>
-          <span className="ml-auto text-xs text-muted">Drag posters between tiers · click a poster to fix its match</span>
+          {toolbar}
+          <span className="ml-auto text-xs text-muted">{hint ?? 'Drag posters between tiers · click a poster for details'}</span>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-black bg-[#1a1a17]">
           {tiers.map((tier, i) => (
-            <TierRow key={tier.id} tier={tier} filmIds={items[tier.id]} filmById={filmById} matches={matches} isFirst={i === 0} isLast={i === tiers.length - 1} />
+            <TierRow
+              key={tier.id}
+              tier={tier}
+              filmIds={items[tier.id] ?? []}
+              filmById={filmById}
+              matches={matches}
+              cardOptions={cardOptions}
+              isFirst={i === 0}
+              isLast={i === tiers.length - 1}
+              onUpdate={(changes) => onTiersChange(updateTier(tiers, tier.id, changes))}
+              onMove={(offset) => onTiersChange(moveTier(tiers, tier.id, offset))}
+              onRemove={() => onTiersChange(removeTier(tiers, tier.id))}
+            />
           ))}
           {tiers.length === 0 && <p className="p-6 text-center text-sm text-muted">No tiers yet. Add one to start ranking.</p>}
         </div>
 
-        <Pool filmIds={items[POOL_ID]} filmById={filmById} matches={matches} />
+        <Pool filmIds={items[POOL_ID]} filmById={filmById} matches={matches} cardOptions={cardOptions} poolSort={poolSort} onPoolSortChange={onPoolSortChange} />
       </div>
 
       <DragOverlay dropAnimation={null}>
-        {activeFilm && <PosterCard film={activeFilm} match={matches[activeFilm.id]} width={cardWidth} showRating={showRatings} lifted />}
+        {activeFilm && <PosterCard film={activeFilm} match={matches[activeFilm.id]} width={cardWidth} showRating={showRatings} badge={badge} lifted />}
       </DragOverlay>
     </DndContext>
   )

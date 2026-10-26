@@ -1,19 +1,29 @@
 import { useMemo } from 'react'
 import { startEnrichment, stopEnrichment } from '../store/enrichment'
+import type { Film } from '../lib/types'
 import { useStore } from '../store/useStore'
 import { Button, ProgressBar } from './ui'
 
-export function EnrichmentStatus({ onOpenSettings }: { onOpenSettings: () => void }) {
+interface Props {
+  onOpenSettings: () => void
+  /** Films whose posters matter on this page (default: the imported library). */
+  films?: Film[]
+  /** Shown instead of the "add a key" banner, e.g. when someone else in a room provides posters. */
+  noKeyMessage?: string
+}
+
+export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessage }: Props) {
   const { running, done, total, error } = useStore((s) => s.enrichment)
   const tmdbKey = useStore((s) => s.tmdbKey)
-  const films = useStore((s) => s.films)
+  const library = useStore((s) => s.films)
+  const films = pageFilms ?? library
   const matches = useStore((s) => s.matches)
   const missing = useMemo(() => films.filter((f) => matches[f.id]?.status !== 'matched').length, [films, matches])
 
   if (!tmdbKey) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-lb-orange/40 bg-lb-orange/10 px-4 py-3 text-sm">
-        <span>Add a free TMDB API key to show posters. Until then films appear as title cards.</span>
+        <span>{noKeyMessage ?? 'Add a free TMDB API key to show posters. Until then films appear as title cards.'}</span>
         <Button variant="primary" onClick={onOpenSettings}>
           Add TMDB key
         </Button>
@@ -45,7 +55,7 @@ export function EnrichmentStatus({ onOpenSettings }: { onOpenSettings: () => voi
           <Button variant="ghost" onClick={onOpenSettings}>
             Settings
           </Button>
-          <Button onClick={() => void startEnrichment()}>Retry</Button>
+          <Button onClick={() => void startEnrichment(films)}>Retry</Button>
         </div>
       </div>
     )
@@ -56,7 +66,7 @@ export function EnrichmentStatus({ onOpenSettings }: { onOpenSettings: () => voi
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-panel px-4 py-3 text-sm">
         <span>{unchecked} films still need a poster lookup.</span>
-        <Button onClick={() => void startEnrichment()}>Resume</Button>
+        <Button onClick={() => void startEnrichment(films)}>Resume</Button>
       </div>
     )
   }
