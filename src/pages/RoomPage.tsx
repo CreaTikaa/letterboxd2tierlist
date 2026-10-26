@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { GroupBoard } from '../components/room/GroupBoard'
 import { MembersPanel } from '../components/room/MembersPanel'
+import { RoomTournament } from '../components/room/RoomTournament'
 import { Showdown } from '../components/room/Showdown'
 import { Button, inputClass } from '../components/ui'
+import { currentMatchKey } from '../lib/room/groupTournament'
 import { navigate } from '../router'
 import { useRoom } from '../store/useRoom'
 import { useStore } from '../store/useStore'
@@ -35,7 +37,7 @@ export function RoomPage({ roomId, onOpenSettings }: { roomId: string; onOpenSet
   return hasName ? <Room roomId={roomId} onOpenSettings={onOpenSettings} /> : <NamePrompt roomId={roomId} />
 }
 
-type Tab = 'board' | 'showdown'
+type Tab = 'board' | 'showdown' | 'tournament'
 
 function Room({ roomId, onOpenSettings }: { roomId: string; onOpenSettings: () => void }) {
   const view = useRoom((s) => s.view)
@@ -48,12 +50,19 @@ function Room({ roomId, onOpenSettings }: { roomId: string; onOpenSettings: () =
     return () => useRoom.getState().leave()
   }, [roomId])
 
-  // Jump to the showdown tab when the host starts one.
+  // Jump to the showdown or tournament tab when the host starts one.
   const phase = view?.state.showdown.phase
   const [lastPhase, setLastPhase] = useState(phase)
   if (phase !== lastPhase) {
     setLastPhase(phase)
     if (phase === 'ranking') setTab('showdown')
+  }
+  const tournamentId = view?.state.tournament.bracket?.id
+  const voting = currentMatchKey(view?.state.tournament.bracket ?? null) != null
+  const [lastTournamentId, setLastTournamentId] = useState(tournamentId)
+  if (tournamentId !== lastTournamentId) {
+    setLastTournamentId(tournamentId)
+    if (tournamentId) setTab('tournament')
   }
 
   const copyLink = async () => {
@@ -94,6 +103,7 @@ function Room({ roomId, onOpenSettings }: { roomId: string; onOpenSettings: () =
               [
                 ['board', 'Group board'],
                 ['showdown', 'Showdown'],
+                ['tournament', 'Tournament'],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -106,10 +116,13 @@ function Room({ roomId, onOpenSettings }: { roomId: string; onOpenSettings: () =
               >
                 {label}
                 {id === 'showdown' && phase && phase !== 'idle' && <span className="ml-1.5 rounded bg-lb-orange px-1 text-[10px] text-ink uppercase">{phase}</span>}
+                {id === 'tournament' && voting && <span className="ml-1.5 rounded bg-lb-orange px-1 text-[10px] text-ink uppercase">live</span>}
               </button>
             ))}
           </div>
-          {tab === 'board' ? <GroupBoard onOpenSettings={onOpenSettings} /> : <Showdown />}
+          {tab === 'board' && <GroupBoard onOpenSettings={onOpenSettings} />}
+          {tab === 'showdown' && <Showdown />}
+          {tab === 'tournament' && <RoomTournament />}
         </>
       )}
     </div>

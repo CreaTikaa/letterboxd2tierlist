@@ -1,5 +1,5 @@
 import type { Match } from '../types'
-import { applyOp, emptyRoomState } from './reducer'
+import { applyOp, emptyRoomState, normalizeRoomState } from './reducer'
 import type { Channel, Transport } from './transport'
 import type { Member, Op, RoomState } from './types'
 
@@ -88,7 +88,7 @@ export class RoomSession {
   constructor(transport: Transport, options: SessionOptions) {
     this.transport = transport
     this.options = options
-    this.state = options.initialState ?? emptyRoomState(options.roomId)
+    this.state = options.initialState ? normalizeRoomState(options.initialState) : emptyRoomState(options.roomId)
     this.ownMember = this.state.members[options.memberId] ?? null
 
     this.hello = transport.channel<Hello>('hello')
@@ -169,7 +169,7 @@ export class RoomSession {
     this.followBestHost()
     if (peerId !== this.hostPeerId) return
 
-    this.state = snapshot.state
+    this.state = normalizeRoomState(snapshot.state)
     this.synced = true
     this.options.onMatches(snapshot.matches)
     // Re-share our films if the host's copy lost or never got them (e.g. we shared while offline).

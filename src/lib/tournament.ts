@@ -166,3 +166,18 @@ export function placeLabel(place: number): string {
   const end = place * 2 - 2
   return `${place}${place === 3 ? 'rd' : 'th'}–${end}th`
 }
+
+export const BRACKET_SIZES = [8, 16, 32, 64, 128, 256]
+
+/** Standard sizes that fit, plus "all N" when N isn't one of them. */
+export function bracketSizeOptions(available: number): number[] {
+  const sizes = BRACKET_SIZES.filter((n) => n <= available)
+  const all = Math.min(available, MAX_ENTRANTS)
+  if (all >= MIN_ENTRANTS && !sizes.includes(all)) sizes.push(all)
+  return sizes
+}
+
+/** The requested size if offered, else the largest option up to 16. */
+export function pickBracketSize(options: number[], requested: number): number {
+  return options.includes(requested) ? requested : (options.filter((n) => n <= 16).at(-1) ?? options[0] ?? 0)
+}

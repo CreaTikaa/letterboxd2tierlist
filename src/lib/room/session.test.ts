@@ -105,7 +105,7 @@ describe('RoomSession', () => {
 
   it('lets the freshest copy win when two hosts meet (room revival)', () => {
     const net = new MemoryNetwork()
-    const saved: RoomState = { id: 'room', version: 7, members: { a: member('a', [film('x', 4)]) }, board: boardWith('x'), showdown: { phase: 'idle', round: 0, filmIds: [], tiers: [], boards: {}, votes: {} } }
+    const saved: RoomState = { id: 'room', version: 7, members: { a: member('a', [film('x', 4)]) }, board: boardWith('x'), showdown: { phase: 'idle', round: 0, filmIds: [], tiers: [], boards: {}, votes: {} }, tournament: { bracket: null, votes: {}, log: [] } }
     // The fresh peer has the smaller member id, but the reviver's copy is newer.
     const fresh = peer(net, '0')
     const reviver = peer(net, 'z', saved)

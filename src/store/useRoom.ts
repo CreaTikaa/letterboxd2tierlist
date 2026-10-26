@@ -1,6 +1,7 @@
 import { get, set } from 'idb-keyval'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { autoResolve } from '../lib/room/groupTournament'
 import { RoomSession, type SessionView } from '../lib/room/session'
 import type { Op, RoomState } from '../lib/room/types'
 import type { Match, Tier } from '../lib/types'
@@ -21,6 +22,11 @@ let cleanup: (() => void) | null = null
 let joinToken = 0
 
 const snapshotKey = (roomId: string) => `room:${roomId}`
+
+/** Everyone currently connected, including you. */
+export function onlineMemberIds(view: SessionView, selfId: string): string[] {
+  return [...new Set([selfId, ...Object.values(view.peers).map((p) => p.memberId)])]
+}
 
 function throttle(fn: () => void, ms: number) {
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -65,10 +71,22 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
 
     let latest: RoomState | null = saved ?? null
     const save = throttle(() => latest && void set(snapshotKey(roomId), latest), 1000)
+    const { profile } = useStore.getState()
     // While applying matches from peers, don't echo them back.
     let receiving = false
+    let resolveTimer: ReturnType<typeof setTimeout> | null = null
+    // As host, close a tournament match once everyone online has voted. The short delay lets the
+    // last vote show up on everyone's screen before the next match replaces it.
+    const scheduleAutoResolve = (view: SessionView) => {
+      if (!view.isHost || resolveTimer || !autoResolve(view.state, onlineMemberIds(view, profile.memberId))) return
+      resolveTimer = setTimeout(() => {
+        resolveTimer = null
+        const now = getState().view
+        const op = now?.isHost && autoResolve(now.state, onlineMemberIds(now, profile.memberId))
+        if (op) session?.dispatch(op)
+      }, 700)
+    }
 
-    const { profile } = useStore.getState()
     const transport = trysteroTransport(roomId, (message) => setState({ error: message }))
     const current = new RoomSession(transport, {
       roomId,
@@ -79,6 +97,7 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
         latest = view.state
         save()
         setState({ view })
+        scheduleAutoResolve(view)
       },
       getMatches: (ids) => {
         const { matches } = useStore.getState()
@@ -108,6 +127,7 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
     })
 
     cleanup = () => {
+      if (resolveTimer) clearTimeout(resolveTimer)
       unsubscribe()
       if (latest) void set(snapshotKey(roomId), latest)
       current.leave()

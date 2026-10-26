@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { groupFilms, memberColor, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
+import { groupFilms, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
 import type { Showdown as ShowdownState } from '../../lib/room/types'
 import { autoFill, clearTiers, defaultRatingMap, placedIds } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
@@ -9,33 +9,10 @@ import { Board } from '../board/Board'
 import { PosterCard } from '../board/PosterCard'
 import { StaticTierList } from '../StaticTierList'
 import { Button, inputClass } from '../ui'
-
-/** Display name for a member id, from whoever we know about. */
-function useNameOf() {
-  const view = useRoom((s) => s.view)!
-  const profile = useStore((s) => s.profile)
-  return useCallback(
-    (memberId: string) => {
-      if (memberId === profile.memberId) return profile.name || 'You'
-      const peer = Object.values(view.peers).find((p) => p.memberId === memberId)
-      return peer?.name || view.state.members[memberId]?.name || 'Someone'
-    },
-    [view, profile],
-  )
-}
+import { MemberTag } from './names'
+import { useNameOf } from './useNameOf'
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-
-function MemberTag({ memberId, suffix }: { memberId: string; suffix?: string }) {
-  const nameOf = useNameOf()
-  return (
-    <span className="inline-flex items-center gap-1.5 font-semibold">
-      <span className="size-2.5 rounded-full" style={{ background: memberColor(memberId) }} />
-      {nameOf(memberId)}
-      {suffix && <span className="font-normal text-muted">{suffix}</span>}
-    </span>
-  )
-}
 
 export function Showdown() {
   const view = useRoom((s) => s.view)!

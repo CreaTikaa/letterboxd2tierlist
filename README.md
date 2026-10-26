@@ -18,6 +18,7 @@ Turn every film you've logged on [Letterboxd](https://letterboxd.com) into a tie
 - **Create a room** and send the invite link. Everyone shares their Letterboxd films with the room.
 - **Group board**: one tier list everyone edits live. It holds every film anyone has watched, each showing the group's average rating and how many people saw it. Filter by group average or by "seen by at least N people", and auto-fill from the average.
 - **Showdown**: the host picks a set of films (for example, ones everyone has seen). Everyone ranks them on their own board in secret, the host reveals all the lists at once, and everyone votes for the best 👑 and worst 💀 list. The results show the winner and the films that split the room most.
+- **Group tournament**: one bracket for the whole room, drawn from films everyone has seen (or at least N of you) and seeded by the **median** rating across the room. Everyone votes on each matchup. A match is decided when everyone online has voted (or the host closes the vote), with the majority winning and ties going to the better seed. Votes stay hidden until the match is decided. The results list every vote.
 - Posters are fetched by anyone in the room who has a TMDB key, then shared with everyone else.
 
 Rooms are **peer-to-peer** (WebRTC via [Trystero](https://github.com/dmotz/trystero)). Browsers find each other through public Nostr relays and then talk directly. There's no server and nothing stored online. The room's first visitor acts as host; if they leave, another member takes over automatically. Every browser keeps a copy of the room, so anyone can reopen it later from the same link. Some strict networks (certain corporate or mobile ones) block direct connections.
@@ -60,7 +61,7 @@ src/
   lib/letterboxd/   export ZIP/CSV parsing and merging
   lib/tmdb/         TMDB client and title/year matching
   lib/export/       PNG renderers, TierMaker ZIP, save files
-  lib/room/         room state, ops, sync protocol (session.ts), group merging, showdown scoring
+  lib/room/         room state, ops, sync protocol (session.ts), group merging, showdown scoring, group tournament voting
   lib/tournament.ts bracket seeding, picks, standings
   lib/              filters, tiers, rating helpers
   store/            Zustand stores (app, room session), poster lookup, import

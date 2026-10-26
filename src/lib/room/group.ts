@@ -7,6 +7,15 @@ export interface GroupFilm extends Film {
   ratings: Record<string, number | null>
   watchers: string[]
   average: number | null
+  /** Median of the members' ratings; used for tournament seeding. */
+  median: number | null
+}
+
+export function median(values: number[]): number | null {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
 const titleKey = (film: Film) => `${film.name.toLowerCase()}|${film.year ?? ''}`
@@ -18,7 +27,7 @@ export function groupFilms(members: Member[]): GroupFilm[] {
     for (const film of member.films) {
       let group = byId.get(film.id) ?? byTitle.get(titleKey(film))
       if (!group) {
-        group = { ...film, rating: null, watchedDate: null, ratings: {}, watchers: [], average: null }
+        group = { ...film, rating: null, watchedDate: null, ratings: {}, watchers: [], average: null, median: null }
         byId.set(film.id, group)
         byTitle.set(titleKey(film), group)
       }
@@ -29,6 +38,7 @@ export function groupFilms(members: Member[]): GroupFilm[] {
   for (const group of byId.values()) {
     const rated = Object.values(group.ratings).filter((r): r is number => r != null)
     group.average = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null
+    group.median = median(rated)
     group.rating = group.average == null ? null : Math.round(group.average * 2) / 2
   }
   return [...byId.values()]
