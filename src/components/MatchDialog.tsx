@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { stars } from '../lib/ratings'
+import { memberColor, type GroupFilm } from '../lib/room/group'
 import type { Film } from '../lib/types'
+import { useRoom } from '../store/useRoom'
 import { getMovie, posterUrl, searchMovies, type TmdbMovie } from '../lib/tmdb/client'
 import { releaseYear, toMatch } from '../lib/tmdb/match'
 import { useStore } from '../store/useStore'
@@ -12,9 +14,26 @@ function parseTmdbId(text: string): number | null {
   return match ? Number(match[1] ?? match[2]) : null
 }
 
+/** Each room member's rating for a film. */
+function GroupRatings({ film }: { film: GroupFilm }) {
+  const members = useRoom((s) => s.view?.state.members ?? {})
+  return (
+    <div className="space-y-0.5">
+      <p>
+        Group average: <span className="text-lb-green">{film.average == null ? 'unrated' : `${film.average.toFixed(2)}★`}</span>
+      </p>
+      {Object.entries(film.ratings).map(([memberId, rating]) => (
+        <p key={memberId} className="flex items-center gap-1.5 text-muted">
+          <span className="size-2 rounded-full" style={{ background: memberColor(memberId) }} />
+          {members[memberId]?.name ?? 'Someone'}: <span className="text-lb-green">{stars(rating)}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
 export function MatchDialog() {
-  const filmId = useStore((s) => s.editingFilmId)
-  const film = useStore((s) => (filmId ? s.films.find((f) => f.id === filmId) : undefined))
+  const film = useStore((s) => s.editingFilm)
   // Keyed by film so the search form resets when another film is opened.
   return film ? <MatchContent key={film.id} film={film} /> : null
 }
@@ -24,8 +43,6 @@ function MatchContent({ film }: { film: Film }) {
   const match = useStore((s) => s.matches[film.id])
   const tmdbKey = useStore((s) => s.tmdbKey)
   const setMatches = useStore((s) => s.setMatches)
-  const tiers = useStore((s) => s.tiers)
-  const setTiers = useStore((s) => s.setTiers)
 
   const [query, setQuery] = useState(film.name)
   const [results, setResults] = useState<TmdbMovie[] | null>(null)
@@ -33,7 +50,6 @@ function MatchContent({ film }: { film: Film }) {
   const [error, setError] = useState<string | null>(null)
 
   const close = () => setEditingFilm(null)
-  const inTier = tiers.find((t) => t.filmIds.includes(film.id))
 
   const search = async () => {
     setBusy(true)
@@ -66,7 +82,7 @@ function MatchContent({ film }: { film: Film }) {
             <p className="text-lg font-semibold text-text">
               {film.name} {film.year && <span className="font-normal text-muted">({film.year})</span>}
             </p>
-            <p className="text-lb-green">{stars(film.rating)}</p>
+            {'ratings' in film ? <GroupRatings film={film as GroupFilm} /> : <p className="text-lb-green">{stars(film.rating)}</p>}
             {film.uri && (
               <a href={film.uri} target="_blank" rel="noreferrer" className="block text-lb-blue hover:underline">
                 Open on Letterboxd ↗
@@ -85,15 +101,6 @@ function MatchContent({ film }: { film: Film }) {
               )}
               {current?.manual && ' · picked by hand'}
             </p>
-            {inTier && (
-              <Button
-                variant="ghost"
-                className="!px-0"
-                onClick={() => setTiers(tiers.map((t) => (t.id === inTier.id ? { ...t, filmIds: t.filmIds.filter((id) => id !== film.id) } : t)))}
-              >
-                Remove from tier “{inTier.label}”
-              </Button>
-            )}
           </div>
         </div>
 

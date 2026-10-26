@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useVisibleFilms } from '../hooks'
+import { useMemo, useState, type ReactNode } from 'react'
 import { countByRating } from '../lib/filter'
 import { RATING_VALUES, stars } from '../lib/ratings'
+import type { Film, Filters } from '../lib/types'
 import { useStore } from '../store/useStore'
 import { Button, inputClass } from './ui'
 
-function Chip({ active, onClick, children, title }: { active: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
+function Chip({ active, onClick, children, title }: { active: boolean; onClick: () => void; children: ReactNode; title?: string }) {
   return (
     <button
       type="button"
@@ -46,15 +46,23 @@ function YearInput({ value, onChange, placeholder }: { value: number | null; onC
   )
 }
 
-export function FilterBar() {
-  const films = useStore((s) => s.films)
-  const filters = useStore((s) => s.filters)
-  const setFilters = useStore((s) => s.setFilters)
+interface Props {
+  /** All films the filters apply to (used for the per-rating counts). */
+  films: Film[]
+  filters: Filters
+  onChange: (filters: Partial<Filters>) => void
+  /** Number of films passing the filters. */
+  visibleCount: number
+  ratingLabel?: string
+  /** Extra controls on the second row. */
+  extra?: ReactNode
+}
+
+export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel = 'Ratings', extra }: Props) {
   const cardWidth = useStore((s) => s.cardWidth)
   const setCardWidth = useStore((s) => s.setCardWidth)
   const showRatings = useStore((s) => s.showRatings)
   const setShowRatings = useStore((s) => s.setShowRatings)
-  const visible = useVisibleFilms()
   const counts = useMemo(() => countByRating(films), [films])
   const selected = new Set(filters.ratings)
 
@@ -67,7 +75,7 @@ export function FilterBar() {
   return (
     <div className="space-y-3 rounded-xl bg-panel p-4">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">Ratings</span>
+        <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">{ratingLabel}</span>
         {RATING_VALUES.map((rating) => (
           <Chip key={rating} active={selected.has(rating)} onClick={() => toggleRating(rating)} title={`${rating} stars`}>
             <span className="text-lb-green">{stars(rating)}</span> <span className="text-muted">{counts.get(rating) ?? 0}</span>
@@ -105,8 +113,9 @@ export function FilterBar() {
           <YearInput placeholder="to" value={filters.yearMax} onChange={(yearMax) => setFilters({ yearMax })} />
         </label>
         <span className="text-muted">
-          Showing <span className="font-semibold text-text">{visible.length}</span> of {films.length}
+          Showing <span className="font-semibold text-text">{visibleCount}</span> of {films.length}
         </span>
+        {extra}
 
         <div className="ml-auto flex items-center gap-4 text-muted">
           <label className="flex items-center gap-2">

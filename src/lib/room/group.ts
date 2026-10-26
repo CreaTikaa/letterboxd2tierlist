@@ -1,0 +1,99 @@
+import { shuffle } from '../random'
+import type { Film, Tier } from '../types'
+import type { Member, Showdown } from './types'
+
+/** A film as seen by the group: everyone's ratings, with `rating` set to the average rounded to ½★. */
+export interface GroupFilm extends Film {
+  ratings: Record<string, number | null>
+  watchers: string[]
+  average: number | null
+}
+
+const titleKey = (film: Film) => `${film.name.toLowerCase()}|${film.year ?? ''}`
+
+export function groupFilms(members: Member[]): GroupFilm[] {
+  const byId = new Map<string, GroupFilm>()
+  const byTitle = new Map<string, GroupFilm>()
+  for (const member of members) {
+    for (const film of member.films) {
+      let group = byId.get(film.id) ?? byTitle.get(titleKey(film))
+      if (!group) {
+        group = { ...film, rating: null, watchedDate: null, ratings: {}, watchers: [], average: null }
+        byId.set(film.id, group)
+        byTitle.set(titleKey(film), group)
+      }
+      group.ratings[member.id] = film.rating
+      if (!group.watchers.includes(member.id)) group.watchers.push(member.id)
+    }
+  }
+  for (const group of byId.values()) {
+    const rated = Object.values(group.ratings).filter((r): r is number => r != null)
+    group.average = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null
+    group.rating = group.average == null ? null : Math.round(group.average * 2) / 2
+  }
+  return [...byId.values()]
+}
+
+export interface ShowdownPickOptions {
+  minWatchers: number
+  count: number
+  mode: 'popular' | 'random'
+}
+
+/** Films for a showdown: watched by enough members, most-watched and best-rated first (or random). */
+export function pickShowdownFilms(films: GroupFilm[], { minWatchers, count, mode }: ShowdownPickOptions, random: () => number = Math.random): string[] {
+  const eligible = films.filter((f) => f.watchers.length >= minWatchers)
+  const ordered =
+    mode === 'random'
+      ? shuffle(eligible, random)
+      : [...eligible].sort((a, b) => b.watchers.length - a.watchers.length || (b.average ?? -1) - (a.average ?? -1) || a.name.localeCompare(b.name))
+  return ordered.slice(0, count).map((f) => f.id)
+}
+
+export interface ShowdownResults {
+  best: { memberId: string; votes: number }[]
+  worst: { memberId: string; votes: number }[]
+  /** Films whose tier placement varied the most between members. */
+  controversial: { filmId: string; spread: number }[]
+  /** Films everyone put in the same tier. */
+  unanimous: { filmId: string; tierIndex: number }[]
+}
+
+function tally(votes: (string | null)[]): { memberId: string; votes: number }[] {
+  const counts = new Map<string, number>()
+  for (const id of votes) if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+  return [...counts].map(([memberId, n]) => ({ memberId, votes: n })).sort((a, b) => b.votes - a.votes)
+}
+
+function tierIndexOf(tiers: Tier[], filmId: string): number | null {
+  const index = tiers.findIndex((t) => t.filmIds.includes(filmId))
+  return index < 0 ? null : index
+}
+
+export function showdownResults(showdown: Showdown): ShowdownResults {
+  const votes = Object.values(showdown.votes)
+  const boards = Object.values(showdown.boards)
+  const controversial: ShowdownResults['controversial'] = []
+  const unanimous: ShowdownResults['unanimous'] = []
+  for (const filmId of showdown.filmIds) {
+    const placed = boards.map((b) => tierIndexOf(b, filmId)).filter((i): i is number => i != null)
+    if (placed.length < 2) continue
+    const spread = Math.max(...placed) - Math.min(...placed)
+    if (spread === 0 && placed.length === boards.length) unanimous.push({ filmId, tierIndex: placed[0] })
+    else controversial.push({ filmId, spread })
+  }
+  return {
+    best: tally(votes.map((v) => v.best)),
+    worst: tally(votes.map((v) => v.worst)),
+    controversial: controversial.sort((a, b) => b.spread - a.spread),
+    unanimous,
+  }
+}
+
+const MEMBER_COLORS = ['#ff8000', '#00e054', '#40bcf4', '#e85dff', '#ffd84a', '#ff5c7a', '#7cf0c5', '#a98bff']
+
+export function memberColor(memberId: string): string {
+  let hash = 0
+  for (const char of memberId) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return MEMBER_COLORS[hash % MEMBER_COLORS.length]
+}
