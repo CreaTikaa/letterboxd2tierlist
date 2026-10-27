@@ -557,6 +557,7 @@ export const pt: Messages = {
   // Bracket and compare
   'bracket.title': 'Chave completa',
   'bracket.bye': 'folga',
+  'bracket.download': 'Baixar imagem da chave',
   'compare.title': 'Comparar:',
   'compare.withMine': 'Com a minha tier list',
   'compare.pastePlaceholder': '…ou cole outro link de compartilhamento',

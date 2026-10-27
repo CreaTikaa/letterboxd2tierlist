@@ -150,6 +150,7 @@ function SharedTournamentView({ tournament, code }: { tournament: SharedTourname
       <h1 className="text-center text-2xl font-bold">{tournament.title}</h1>
       <TournamentResults
         tournament={bracket}
+        title={tournament.title}
         matches={matches}
         readOnly
         actions={

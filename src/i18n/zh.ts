@@ -553,6 +553,7 @@ export const zh: Messages = {
   // Bracket and compare
   'bracket.title': '完整对阵图',
   'bracket.bye': '轮空',
+  'bracket.download': '下载对阵图图片',
   'compare.title': '对比：',
   'compare.withMine': '和我的梯队榜对比',
   'compare.pastePlaceholder': '…或粘贴另一个分享链接',

@@ -548,6 +548,7 @@ export const en = {
   // Bracket and compare
   'bracket.title': "Full bracket",
   'bracket.bye': "bye",
+  'bracket.download': "Download bracket image",
   'compare.title': "Compare:",
   'compare.withMine': "With my tier list",
   'compare.pastePlaceholder': "…or paste another share link",

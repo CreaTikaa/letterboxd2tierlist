@@ -559,6 +559,7 @@ export const fr: Messages = {
   // Bracket and compare
   'bracket.title': 'Tableau complet',
   'bracket.bye': 'exempté',
+  'bracket.download': "Télécharger l'image du tableau",
   'compare.title': 'Comparer :',
   'compare.withMine': 'Avec ma tier list',
   'compare.pastePlaceholder': '…ou collez un autre lien de partage',

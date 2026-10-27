@@ -40,6 +40,9 @@ test('solo tournament: play, undo, bracket, share, send to tier list', async ({ 
 
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download image' }).click()])
   expect(fs.statSync((await download.path())!).size).toBeGreaterThan(10_000)
+  const [bracketImage] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download bracket image' }).click()])
+  expect(bracketImage.suggestedFilename()).toMatch(/^bracket-.*\.png$/)
+  expect(fs.statSync((await bracketImage.path())!).size).toBeGreaterThan(10_000)
 
   // Share link, opened by someone with no data and no TMDB key.
   const link = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
