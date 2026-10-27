@@ -1,4 +1,4 @@
-import { addTmdbKey, expect, fixtures, importExport, onlyFiveStars, newUser, readClipboard, test, type Page } from './support'
+import { addTmdbKey, copyLink, expect, fixtures, importExport, onlyFiveStars, newUser, test, waitForSave, type Page } from './support'
 
 const LANGS = ['en', 'fr', 'zh', 'pt'] as const
 
@@ -49,6 +49,8 @@ async function stage(page: Page, name: string) {
     collected[name][lang] = await texts(page)
   }
   await setLanguage(page, 'en')
+  // The next step may reload the page: don't let it come back in the last language tried.
+  await waitForSave(page)
 }
 
 for (const [locale, heading] of [
@@ -96,8 +98,7 @@ test('every screen is fully translated', async ({ page, browser }) => {
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Export' }).click()
   await stage(page, 'export-dialog')
-  await page.getByRole('button', { name: /Copy share link/ }).click()
-  const listLink = await readClipboard(page)
+  const listLink = await copyLink(page, page.getByRole('button', { name: /Copy share link/ }))
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/#/tournament')
@@ -112,8 +113,7 @@ test('every screen is fully translated', async ({ page, browser }) => {
   }
   await page.getByText('Full bracket').click()
   await stage(page, 'tournament-results')
-  await page.getByRole('button', { name: 'Share link' }).click()
-  const tournamentLink = await readClipboard(page)
+  const tournamentLink = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
 
   await page.goto('/')
   await onlyFiveStars(page)
@@ -128,8 +128,7 @@ test('every screen is fully translated', async ({ page, browser }) => {
     await expect(page.getByText(before)).toHaveCount(0)
   }
   await stage(page, 'rank-results')
-  await page.getByRole('button', { name: 'Share link' }).click()
-  const rankingLink = await readClipboard(page)
+  const rankingLink = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
 
   for (const [name, link] of [
     ['shared-list', listLink],

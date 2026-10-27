@@ -1,4 +1,4 @@
-import { addTmdbKey, expect, fixtures, importExport, readClipboard, strangerPage, test } from './support'
+import { addTmdbKey, copyLink, expect, fixtures, importExport, strangerPage, test } from './support'
 
 test('share a tier list, open it elsewhere, compare two lists', async ({ page, browser }) => {
   await page.goto('/')
@@ -8,9 +8,8 @@ test('share a tier list, open it elsewhere, compare two lists', async ({ page, b
   await page.getByRole('button', { name: /Apply to 80 visible films/ }).click()
 
   await page.getByRole('button', { name: 'Export' }).click()
-  await page.getByRole('button', { name: /Copy share link/ }).click()
+  const mine = await copyLink(page, page.getByRole('button', { name: /Copy share link/ }))
   await expect(page.getByText(/Link copied/)).toBeVisible()
-  const mine = await readClipboard(page)
   await page.getByRole('button', { name: 'Close' }).click()
   const placed = await page.locator('[data-tier] .flex-1 [title]').count()
 
@@ -28,8 +27,7 @@ test('share a tier list, open it elsewhere, compare two lists', async ({ page, b
   await page.getByRole('toolbar').getByRole('button', { name: 'S', exact: true }).click()
   await expect(page.locator('[data-tier]').first().locator('[title^="Cats"]')).toHaveCount(1)
   await page.getByRole('button', { name: 'Export' }).click()
-  await page.getByRole('button', { name: /Copy share link/ }).click()
-  const changed = await readClipboard(page)
+  const changed = await copyLink(page, page.getByRole('button', { name: /Copy share link/ }))
   await page.getByRole('button', { name: 'Close' }).click()
 
   await friend.getByPlaceholder('…or paste another share link').fill(changed)

@@ -1,4 +1,4 @@
-import { test as base, expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { test as base, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -285,8 +285,16 @@ export async function onlyFiveStars(page: Page) {
 
 export const showing = async (page: Page) => Number((await page.getByText(/^Showing/).innerText()).match(/Showing (\d+)/)![1])
 
-export async function readClipboard(page: Page) {
-  return page.evaluate(() => navigator.clipboard.readText())
+/**
+ * Clicks a copy button and returns what it put on the clipboard. Links are built asynchronously,
+ * and contexts can share one clipboard, so it's emptied first and read once something lands.
+ */
+export async function copyLink(page: Page, button: Locator) {
+  await page.evaluate(() => navigator.clipboard.writeText(''))
+  await button.click()
+  let text = ''
+  await expect.poll(async () => (text = await page.evaluate(() => navigator.clipboard.readText()))).not.toBe('')
+  return text
 }
 
 /** Drags with the mouse, in steps, so dnd-kit sees a real drag. */
