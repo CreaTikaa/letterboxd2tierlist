@@ -77,6 +77,10 @@ test('import, posters, filters, auto-fill, drag, edit and export', async ({ page
   await expect(page.locator('textarea[aria-label="Tier name"]')).toHaveCount(7)
   await page.locator('textarea[aria-label="Tier name"]').first().fill('GOAT')
   await expect(page.locator('textarea[aria-label="Tier name"]').first()).toHaveValue('GOAT')
+  // Even a reload right after a change (before the batched save) keeps it.
+  await page.reload()
+  await expect(page.locator('textarea[aria-label="Tier name"]')).toHaveCount(7)
+  await expect(page.locator('textarea[aria-label="Tier name"]').first()).toHaveValue('GOAT')
 
   // Fix a poster by TMDB URL (poster → Details).
   await tierCards(page, 0).first().click()
