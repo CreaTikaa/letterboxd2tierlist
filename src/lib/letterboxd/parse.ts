@@ -112,7 +112,8 @@ export function applyLikes(films: Film[], likesCsv: string): Film[] {
 export function parseList(text: string, fileName: string): LetterboxdList | null {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
   const id = fileName.split('/').pop()!.replace(/\.csv$/i, '')
-  let name = id.replace(/[-_]+/g, ' ')
+  // "guilty-pleasures.csv" → "Guilty pleasures"
+  let name = id.replace(/[-_]+/g, ' ').replace(/^\p{Ll}/u, (letter) => letter.toUpperCase())
   let entriesStart = 0
 
   const metaHeader = lines.findIndex((line) => /^date,name/i.test(line.trim()))

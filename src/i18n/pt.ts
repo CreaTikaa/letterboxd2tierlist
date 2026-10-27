@@ -505,6 +505,9 @@ export const pt: Messages = {
   'board.moveTo': 'Mover {film} para…',
   'board.unplace': 'Tirar',
   'board.details': 'Detalhes',
+  'find.placeholder': 'Encontrar um filme… (Ctrl+F)',
+  'find.label': 'Encontrar um filme no quadro',
+  'find.none': 'Nenhum filme aqui corresponde. Os filtros podem estar escondendo.',
 
   // Lists and likes
   'import.importedExtras': '{count} filmes importados ({rated} com nota, {liked} curtidos) e {lists}.',
@@ -560,7 +563,7 @@ export const pt: Messages = {
   'compare.go': 'Comparar',
   'compare.mine': 'Minha tier list',
   'compare.summary': 'de concordância em {common} filmes em comum · {onlyA} só em “{a}”, {onlyB} só em “{b}”',
-  'compare.nothingInCommon': 'Essas duas tier lists não têm filmes em comum.',
+  'compare.nothingInCommon': 'Esses dois não têm filmes em comum.',
   'compare.disagreements': 'Maiores discordâncias',
   'tournament.shareTitle': 'Meu torneio do Letterboxd',
   'source.visible': 'Mostrados na minha tier list ({count})',

@@ -72,15 +72,39 @@ export function peopleIndex(films: Film[], matches: Record<string, Match>, credi
   return [...people.values()]
 }
 
+/** Lower case, without accents or punctuation: "Amélie" matches "amelie", "Mission: Impossible" matches "mission impossible". */
+export const foldText = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+
+/** Films whose title (or "title year") contains the query, titles that start with it first. */
+export function findFilms(films: Film[], query: string, limit = 8): Film[] {
+  const folded = foldText(query)
+  if (!folded) return []
+  const starts: Film[] = []
+  const contains: Film[] = []
+  for (const film of films) {
+    const text = foldText(`${film.name} ${film.year ?? ''}`)
+    if (text.startsWith(folded)) starts.push(film)
+    else if (text.includes(folded)) contains.push(film)
+  }
+  const byName = (a: Film, b: Film) => a.name.localeCompare(b.name) || (a.year ?? 0) - (b.year ?? 0)
+  return [...starts.sort(byName), ...contains.sort(byName)].slice(0, limit)
+}
+
 /** `matches` is needed for the genre filter, `credits` for the person filter. */
 export function filterFilms(films: Film[], filters: Filters, matches: Record<string, Match> = {}, credits: Record<number, Credits> = {}): Film[] {
   const allowed = new Set(filters.ratings)
-  const query = filters.search.trim().toLowerCase()
+  const query = foldText(filters.search)
   // Saved filters from before genres existed have no `genres`.
   const genres = new Set(filters.genres ?? [])
   return films.filter((film) => {
     if (film.rating == null ? !filters.includeUnrated : !allowed.has(film.rating)) return false
-    if (query && !film.name.toLowerCase().includes(query)) return false
+    if (query && !foldText(film.name).includes(query)) return false
     if (filters.yearMin != null && (film.year == null || film.year < filters.yearMin)) return false
     if (filters.yearMax != null && (film.year == null || film.year > filters.yearMax)) return false
     if (genres.size && !genresOf(matches[film.id])?.some((g) => genres.has(g))) return false

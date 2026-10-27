@@ -1,50 +1,68 @@
 import { useEffect, useMemo, useState } from 'react'
+import { RankingList } from '../components/RankingList'
 import { StaticTierList } from '../components/StaticTierList'
 import { textColorFor } from '../lib/export/canvas'
 import { errorMessage, useT } from '../i18n'
-import { compareLists } from '../lib/compare'
+import { useTournamentText } from '../i18n/tournamentText'
+import { compareLists, rankingAsList, tournamentAsList } from '../lib/compare'
 import { titleKey } from '../lib/letterboxd/parse'
 import { posterUrl } from '../lib/tmdb/client'
-import { boardFromSharedList, decodeSharedList, sharedListFromBoard, type SharedList } from '../lib/share'
+import { boardFromSharedList, decodeShared, rankingFromShared, sharedListFromBoard, type SharedItem, type SharedList, type SharedRanking } from '../lib/share'
 import { useStore } from '../store/useStore'
 
-type State = { status: 'loading' } | { status: 'ready'; a: SharedList; b: SharedList } | { status: 'error'; error: unknown }
+/** One side of the comparison: tiers to compare (a ranking has one film per tier), and the ranking itself to show it as one. */
+interface Side {
+  list: SharedList
+  ranking?: SharedRanking
+}
 
-function ListColumn({ list, common, title }: { list: SharedList; common: Set<string>; title: string }) {
-  const board = useMemo(() => boardFromSharedList(list), [list])
+type State = { status: 'loading' } | { status: 'ready'; a: Side; b: Side } | { status: 'error'; error: unknown }
+
+function ListColumn({ side, common, title }: { side: Side; common: Set<string>; title: string }) {
+  const board = useMemo(() => (side.ranking ? { ...rankingFromShared(side.ranking), tiers: null } : boardFromSharedList(side.list)), [side])
   const filmById = useMemo(() => new Map(board.films.map((f) => [f.id, f])), [board])
   // Films only this list has are faded, so shared ones stand out.
   const dimmed = useMemo(() => new Set(board.films.filter((f) => !common.has(titleKey(f))).map((f) => f.id)), [board, common])
   return (
     <div className="min-w-0 space-y-2">
       <h2 className="truncate font-semibold">{title}</h2>
-      <StaticTierList tiers={board.tiers} filmById={filmById} matches={board.matches} cardWidth={48} dimmed={dimmed} />
+      {board.tiers ? (
+        <StaticTierList tiers={board.tiers} filmById={filmById} matches={board.matches} cardWidth={48} dimmed={dimmed} />
+      ) : (
+        <RankingList films={board.films} matches={board.matches} small dimmed={dimmed} />
+      )}
     </div>
   )
 }
 
-/** Two tier lists side by side, with how much they agree and where they differ most. */
+/** Two tier lists, tournaments or rankings side by side, with how much they agree and where they differ most. */
 export function ComparePage({ a, b }: { a: string; b: string }) {
   const t = useT()
+  const { placeLabel } = useTournamentText()
   const [state, setState] = useState<State>({ status: 'loading' })
 
   useEffect(() => {
     let cancelled = false
-    const mine = (): SharedList => {
+    const mine = (): Side => {
       const { tiers, films, lists, matches } = useStore.getState()
-      return sharedListFromBoard(t('compare.mine'), tiers, [...films, ...lists.flatMap((l) => l.films)], matches)
+      return { list: sharedListFromBoard(t('compare.mine'), tiers, [...films, ...lists.flatMap((l) => l.films)], matches) }
     }
-    Promise.all([decodeSharedList(a), b === 'mine' ? mine() : decodeSharedList(b)]).then(
-      ([listA, listB]) => !cancelled && setState({ status: 'ready', a: listA, b: listB }),
+    const side = (item: SharedItem): Side => {
+      if (item.kind === 'tierlist') return { list: item.list }
+      if (item.kind === 'ranking') return { list: rankingAsList(item.ranking), ranking: item.ranking }
+      return { list: tournamentAsList(item.tournament, placeLabel) }
+    }
+    Promise.all([decodeShared(a).then(side), b === 'mine' ? mine() : decodeShared(b).then(side)]).then(
+      ([sideA, sideB]) => !cancelled && setState({ status: 'ready', a: sideA, b: sideB }),
       (error: unknown) => !cancelled && setState({ status: 'error', error }),
     )
     return () => {
       cancelled = true
     }
     // Your own board is read once, when the page opens.
-  }, [a, b, t])
+  }, [a, b, t, placeLabel])
 
-  const comparison = useMemo(() => (state.status === 'ready' ? compareLists(state.a, state.b) : null), [state])
+  const comparison = useMemo(() => (state.status === 'ready' ? compareLists(state.a.list, state.b.list) : null), [state])
   const common = useMemo(() => new Set(comparison?.common.map((c) => titleKey(c)) ?? []), [comparison])
 
   if (state.status === 'loading') return <p className="py-10 text-center text-muted">{t('view.opening')}</p>
@@ -52,8 +70,8 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
     return <p className="py-10 text-center text-lg font-semibold">{errorMessage(t, state.status === 'error' ? state.error : null)}</p>
   }
 
-  const titleA = state.a.title || t('view.untitled')
-  const titleB = state.b.title || t('view.untitled')
+  const titleA = state.a.list.title || t('view.untitled')
+  const titleB = state.b.list.title || t('view.untitled')
   const label = (list: SharedList, index: number) => {
     const tier = list.tiers[index]
     return (
@@ -94,9 +112,9 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
                 <span className="min-w-0 flex-1 truncate">
                   {c.name} <span className="text-muted">{c.year ?? ''}</span>
                 </span>
-                {label(state.a, c.tierA)}
+                {label(state.a.list, c.tierA)}
                 <span className="text-muted">→</span>
-                {label(state.b, c.tierB)}
+                {label(state.b.list, c.tierB)}
               </li>
             ))}
           </ul>
@@ -104,8 +122,8 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ListColumn list={state.a} common={common} title={titleA} />
-        <ListColumn list={state.b} common={common} title={titleB} />
+        <ListColumn side={state.a} common={common} title={titleA} />
+        <ListColumn side={state.b} common={common} title={titleB} />
       </div>
     </div>
   )

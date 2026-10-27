@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_FILTERS, countByGenre, filterFilms, peopleIndex, sortFilms } from './filter'
+import { DEFAULT_FILTERS, countByGenre, filterFilms, findFilms, foldText, peopleIndex, sortFilms } from './filter'
 import type { Film, Match } from './types'
 
 const film = (name: string, rating: number | null, year: number | null = 2000, watchedDate: string | null = null): Film => ({
@@ -83,5 +83,26 @@ describe('people filter', () => {
     const people = peopleIndex(FILMS, matches, credits)
     expect(people.find((p) => p.id === 20)).toEqual({ id: 20, name: 'Sigourney Weaver', directed: 0, acted: 2 })
     expect(people.find((p) => p.id === 11)).toMatchObject({ directed: 1, acted: 0 })
+  })
+})
+
+describe('findFilms', () => {
+  const films = [film('Amélie', 4, 2001), film('Mission: Impossible - Fallout', 4, 2018), film('Dune', 4, 2021), film('Dune', 2, 1984), film('Prisoners of Dune', 3, 1999)]
+  const names = (query: string) => findFilms(films, query).map((f) => `${f.name} ${f.year}`)
+
+  it('ignores case, accents and punctuation', () => {
+    expect(foldText('  Mission: Impossible – Fallout ')).toBe('mission impossible fallout')
+    expect(names('amelie')).toEqual(['Amélie 2001'])
+    expect(names('mission impossible')).toEqual(['Mission: Impossible - Fallout 2018'])
+  })
+
+  it('lists titles starting with the query first, and accepts a year', () => {
+    expect(names('dune')).toEqual(['Dune 1984', 'Dune 2021', 'Prisoners of Dune 1999'])
+    expect(names('dune 1984')).toEqual(['Dune 1984'])
+  })
+
+  it('finds nothing for an empty query, and stops at the limit', () => {
+    expect(findFilms(films, ' : ')).toEqual([])
+    expect(findFilms(films, 'e', 2)).toHaveLength(2)
   })
 })

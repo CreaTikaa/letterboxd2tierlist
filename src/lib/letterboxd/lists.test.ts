@@ -25,7 +25,7 @@ describe('parseList', () => {
 
   it('falls back to the file name and plain entry tables', () => {
     const list = parseList('Position,Name,Year,URL\n1,Alpha,2000,https://boxd.it/a\n', 'lists/my_list.csv')!
-    expect(list.name).toBe('my list')
+    expect(list.name).toBe('My list')
     expect(list.films).toHaveLength(1)
   })
 

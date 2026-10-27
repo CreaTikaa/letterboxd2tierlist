@@ -496,6 +496,9 @@ export const en = {
   'board.moveTo': "Move {film} to…",
   'board.unplace': "Unplace",
   'board.details': "Details",
+  'find.placeholder': "Find a film… (Ctrl+F)",
+  'find.label': "Find a film on the board",
+  'find.none': "No film here matches. Filters may be hiding it.",
 
   // Lists and likes
   'import.importedExtras': "Imported {count} films ({rated} rated, {liked} liked) and {lists}.",
@@ -551,7 +554,7 @@ export const en = {
   'compare.go': "Compare",
   'compare.mine': "My tier list",
   'compare.summary': "agreement on {common} films in common · {onlyA} only in “{a}”, {onlyB} only in “{b}”",
-  'compare.nothingInCommon': "These two tier lists have no films in common.",
+  'compare.nothingInCommon': "These two have no films in common.",
   'compare.disagreements': "Biggest disagreements",
   'tournament.shareTitle': "My Letterboxd tournament",
   'source.visible': "Shown on my tier list ({count})",
