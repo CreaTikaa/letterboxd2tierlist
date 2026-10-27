@@ -22,19 +22,22 @@ export function createCanvas(width: number, height: number) {
   return { canvas, ctx: canvas.getContext('2d')! }
 }
 
+/** Wraps on spaces, and between characters of scripts written without spaces (Chinese, Japanese…). */
 export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+  // One token per CJK character (each can start a new line), whole words otherwise, and runs of spaces.
+  const tokens = text.match(/[⺀-鿿가-힯＀-￯]|[^\s⺀-鿿가-힯＀-￯]+|\s+/g) ?? []
   const lines: string[] = []
   let line = ''
-  for (const word of text.split(/\s+/)) {
-    const candidate = line ? `${line} ${word}` : word
-    if (ctx.measureText(candidate).width <= maxWidth || !line) {
-      line = candidate
+  for (const token of tokens) {
+    const candidate = line + token
+    if (!line.trim() || ctx.measureText(candidate.trimEnd()).width <= maxWidth) {
+      line = line.trim() ? candidate : token.trimStart()
     } else {
-      lines.push(line)
-      line = word
+      lines.push(line.trimEnd())
+      line = token.trimStart()
     }
   }
-  if (line) lines.push(line)
+  if (line.trim()) lines.push(line.trimEnd())
   if (lines.length <= maxLines) return lines
   const kept = lines.slice(0, maxLines)
   let last = kept[maxLines - 1]
@@ -71,8 +74,17 @@ export function drawPlaceholder(ctx: CanvasRenderingContext2D, film: Film, x: nu
   }
 }
 
-/** Dark band at the bottom of a poster with the title, and optionally the rating. */
-export function drawCaption(ctx: CanvasRenderingContext2D, film: Film, withRating: boolean, x: number, y: number, w: number, h: number) {
+/** Dark band at the bottom of a poster with the title, and optionally the rating (`unratedLabel` when there's none). */
+export function drawCaption(
+  ctx: CanvasRenderingContext2D,
+  film: Film,
+  withRating: boolean,
+  unratedLabel: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   const size = Math.round(w / 12)
   ctx.font = `600 ${size}px ${FONT}`
   const lines = wrapText(ctx, film.year ? `${film.name} (${film.year})` : film.name, w * 0.9, 2)
@@ -95,7 +107,7 @@ export function drawCaption(ctx: CanvasRenderingContext2D, film: Film, withRatin
   }
   if (withRating) {
     ctx.fillStyle = film.rating == null ? '#9ab' : '#00e054'
-    ctx.fillText(stars(film.rating), x + w / 2, lineY)
+    ctx.fillText(film.rating == null ? unratedLabel : stars(film.rating), x + w / 2, lineY)
   }
 }
 

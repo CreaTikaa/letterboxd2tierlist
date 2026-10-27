@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useT } from '../i18n'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
@@ -33,6 +34,7 @@ export function Dialog({
   wide?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const t = useT()
   useEffect(() => {
     const dialog = ref.current!
     if (open && !dialog.open) dialog.showModal()
@@ -50,7 +52,7 @@ export function Dialog({
         <div className="flex max-h-[85vh] flex-col">
           <div className="flex items-center justify-between border-b border-line px-5 py-3">
             <h2 className="text-lg font-semibold">{title}</h2>
-            <button type="button" onClick={onClose} className="rounded p-1 text-muted hover:text-text" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded p-1 text-muted hover:text-text" aria-label={t('common.close')}>
               ✕
             </button>
           </div>

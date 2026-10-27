@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, type ReactNode } from 'react'
+import { useT } from '../../i18n'
 import { stars } from '../../lib/ratings'
 import { posterUrl } from '../../lib/tmdb/client'
 import type { Film, Match } from '../../lib/types'
@@ -22,7 +23,8 @@ interface CardProps extends Omit<CardOptions, 'onClick'> {
 
 export function PosterCard({ film, match, width, showRating, badge, lifted = false }: CardProps) {
   const poster = match?.status === 'matched' && match.posterPath ? posterUrl(match.posterPath, width > 92 ? 'w185' : 'w154') : null
-  const label = `${film.name}${film.year ? ` (${film.year})` : ''} · ${stars(film.rating)}`
+  const t = useT()
+  const label = `${film.name}${film.year ? ` (${film.year})` : ''} · ${film.rating == null ? t('common.unrated') : stars(film.rating)}`
   const strip = badge ? badge(film) : film.rating != null ? stars(film.rating) : null
 
   return (

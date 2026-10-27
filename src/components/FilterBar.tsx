@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { countByGenre, countByRating } from '../lib/filter'
-import { genreName } from '../lib/genres'
+import { genreLabel, useT } from '../i18n'
+import { Trans } from '../i18n/Trans'
 import { RATING_VALUES, stars } from '../lib/ratings'
 import type { Film, Filters, Match } from '../lib/types'
 import { useStore } from '../store/useStore'
@@ -77,7 +78,8 @@ interface Props {
   matches?: Record<string, Match>
 }
 
-export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel = 'Ratings', extra, matches }: Props) {
+export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel, extra, matches }: Props) {
+  const t = useT()
   const cardWidth = useStore((s) => s.cardWidth)
   const setCardWidth = useStore((s) => s.setCardWidth)
   const showRatings = useStore((s) => s.showRatings)
@@ -98,21 +100,21 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
   return (
     <div className="space-y-3 rounded-xl bg-panel p-4">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">{ratingLabel}</span>
+        <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">{ratingLabel ?? t('filters.ratings')}</span>
         {RATING_VALUES.map((rating) => (
-          <Chip key={rating} active={selected.has(rating)} onClick={() => toggleRating(rating)} title={`${rating} stars`}>
+          <Chip key={rating} active={selected.has(rating)} onClick={() => toggleRating(rating)} title={t('filters.starsTitle', { count: rating })}>
             <span className="text-lb-green">{stars(rating)}</span> <span className="text-muted">{counts.get(rating) ?? 0}</span>
           </Chip>
         ))}
         <Chip active={filters.includeUnrated} onClick={() => setFilters({ includeUnrated: !filters.includeUnrated })}>
-          Unrated <span className="text-muted">{counts.get(null) ?? 0}</span>
+          {t('common.unrated')} <span className="text-muted">{counts.get(null) ?? 0}</span>
         </Chip>
         <span className="mx-1 h-4 w-px bg-line" />
         <Button variant="ghost" className="!px-2 !py-0.5 text-xs" onClick={() => setFilters({ ratings: [...RATING_VALUES], includeUnrated: true })}>
-          All
+          {t('filters.all')}
         </Button>
         <Button variant="ghost" className="!px-2 !py-0.5 text-xs" onClick={() => setFilters({ ratings: [], includeUnrated: false })}>
-          None
+          {t('filters.none')}
         </Button>
         {[4, 3].map((min) => (
           <Button key={min} variant="ghost" className="!px-2 !py-0.5 text-xs" onClick={() => atLeast(min)}>
@@ -123,13 +125,13 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
 
       {genreCounts.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">Genres</span>
+          <span className="mr-1 text-xs font-semibold tracking-wide text-muted uppercase">{t('filters.genres')}</span>
           <GenreChip active={selectedGenres.size === 0} onClick={() => setFilters({ genres: [] })}>
-            Any
+            {t('filters.anyGenre')}
           </GenreChip>
           {genreCounts.map(([genre, count]) => (
             <GenreChip key={genre} active={selectedGenres.has(genre)} onClick={() => toggleGenre(genre)}>
-              {genreName(genre)} <span className="text-muted">{count}</span>
+              {genreLabel(t, genre)} <span className="text-muted">{count}</span>
             </GenreChip>
           ))}
         </div>
@@ -138,30 +140,30 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <input
           type="search"
-          placeholder="Search titles…"
+          placeholder={t('filters.search')}
           value={filters.search}
           onChange={(e) => setFilters({ search: e.target.value })}
           className={`${inputClass} w-48`}
         />
         <label className="flex items-center gap-1.5 text-muted">
-          Years
-          <YearInput placeholder="from" value={filters.yearMin} onChange={(yearMin) => setFilters({ yearMin })} />
+          {t('filters.years')}
+          <YearInput placeholder={t('filters.yearFrom')} value={filters.yearMin} onChange={(yearMin) => setFilters({ yearMin })} />
           –
-          <YearInput placeholder="to" value={filters.yearMax} onChange={(yearMax) => setFilters({ yearMax })} />
+          <YearInput placeholder={t('filters.yearTo')} value={filters.yearMax} onChange={(yearMax) => setFilters({ yearMax })} />
         </label>
         <span className="text-muted">
-          Showing <span className="font-semibold text-text">{visibleCount}</span> of {films.length}
+          <Trans k="filters.showing" params={{ visible: visibleCount, total: films.length }} tags={{ b: (text) => <span className="font-semibold text-text">{text}</span> }} />
         </span>
         {extra}
 
         <div className="ml-auto flex items-center gap-4 text-muted">
           <label className="flex items-center gap-2">
-            Size
+            {t('filters.size')}
             <input type="range" min={48} max={140} step={4} value={cardWidth} onChange={(e) => setCardWidth(Number(e.target.value))} className="w-24 accent-lb-green" />
           </label>
           <label className="flex items-center gap-1.5">
             <input type="checkbox" checked={showRatings} onChange={(e) => setShowRatings(e.target.checked)} className="accent-lb-green" />
-            Show stars
+            {t('filters.showStars')}
           </label>
         </div>
       </div>

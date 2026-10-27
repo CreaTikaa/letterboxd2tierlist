@@ -43,8 +43,8 @@ export function placedIds(tiers: Tier[]): Set<string> {
   return new Set(tiers.flatMap((t) => t.filmIds))
 }
 
-export function addTier(tiers: Tier[]): Tier[] {
-  return [...tiers, { id: newTierId(), label: 'New', color: TIER_COLORS[tiers.length % TIER_COLORS.length], filmIds: [] }]
+export function addTier(tiers: Tier[], label: string): Tier[] {
+  return [...tiers, { id: newTierId(), label, color: TIER_COLORS[tiers.length % TIER_COLORS.length], filmIds: [] }]
 }
 
 export function updateTier(tiers: Tier[], id: string, changes: Partial<Omit<Tier, 'id'>>): Tier[] {

@@ -1,4 +1,4 @@
-/** TMDB's movie genres (stable ids; names in English for now). */
+/** TMDB's movie genres (stable ids). English names for reference; the UI uses translations. */
 export const GENRES: Record<number, string> = {
   28: 'Action',
   12: 'Adventure',
@@ -20,5 +20,3 @@ export const GENRES: Record<number, string> = {
   10752: 'War',
   37: 'Western',
 }
-
-export const genreName = (id: number) => GENRES[id] ?? `Genre ${id}`

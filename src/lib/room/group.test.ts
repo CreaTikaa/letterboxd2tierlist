@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultTiers } from '../tiers'
 import type { Film, Tier } from '../types'
-import { anonymousOrder, groupFilms, guessResults, listLabel, pickShowdownFilms, showdownResults } from './group'
+import { anonymousOrder, groupFilms, guessResults, listLetter, pickShowdownFilms, showdownResults } from './group'
 import { applyOp, emptyRoomState, emptyShowdown } from './reducer'
 import type { Member } from './types'
 
@@ -77,7 +77,8 @@ describe('guess whose list', () => {
     expect(anonymousOrder({ ...emptyShowdown(), round: 3, boards: { cat: boards.cat, ann: boards.ann, bob: boards.bob } })).toEqual(order)
     const orders = new Set(Array.from({ length: 10 }, (_, round) => anonymousOrder({ ...emptyShowdown(), round, boards }).join()))
     expect(orders.size).toBeGreaterThan(1)
-    expect(listLabel(0)).toBe('List A')
+    expect(listLetter(0)).toBe('A')
+    expect(listLetter(2)).toBe('C')
   })
 
   it('scores guesses, ignoring guesses about your own list', () => {

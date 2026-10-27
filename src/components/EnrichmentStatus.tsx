@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { startEnrichment, stopEnrichment } from '../store/enrichment'
+import { useT } from '../i18n'
 import type { Film } from '../lib/types'
 import { useStore } from '../store/useStore'
 import { Button, ProgressBar } from './ui'
@@ -18,14 +19,15 @@ export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessag
   const library = useStore((s) => s.films)
   const films = pageFilms ?? library
   const matches = useStore((s) => s.matches)
+  const t = useT()
   const missing = useMemo(() => films.filter((f) => matches[f.id]?.status !== 'matched').length, [films, matches])
 
   if (!tmdbKey) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-lb-orange/40 bg-lb-orange/10 px-4 py-3 text-sm">
-        <span>{noKeyMessage ?? 'Add a free TMDB API key to show posters. Until then films appear as title cards.'}</span>
+        <span>{noKeyMessage ?? t('posters.noKey')}</span>
         <Button variant="primary" onClick={onOpenSettings}>
-          Add TMDB key
+          {t('posters.addKey')}
         </Button>
       </div>
     )
@@ -36,10 +38,10 @@ export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessag
       <div className="space-y-2 rounded-lg bg-panel px-4 py-3 text-sm">
         <div className="flex items-center justify-between gap-3">
           <span>
-            Finding posters… <span className="text-muted">{done} / {total}</span>
+            {t('posters.finding')} <span className="text-muted">{done} / {total}</span>
           </span>
           <Button variant="ghost" onClick={stopEnrichment}>
-            Stop
+            {t('posters.stop')}
           </Button>
         </div>
         <ProgressBar value={done} max={total} />
@@ -50,12 +52,12 @@ export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessag
   if (error) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
-        <span>{error}</span>
+        <span>{error.code === 'invalidKey' ? t('errors.tmdbInvalidKey') : t('posters.failed', { count: error.count })}</span>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onOpenSettings}>
-            Settings
+            {t('common.settings')}
           </Button>
-          <Button onClick={() => void startEnrichment(films)}>Retry</Button>
+          <Button onClick={() => void startEnrichment(films)}>{t('posters.retry')}</Button>
         </div>
       </div>
     )
@@ -65,8 +67,8 @@ export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessag
   if (unchecked > 0) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-panel px-4 py-3 text-sm">
-        <span>{unchecked} films still need a poster lookup.</span>
-        <Button onClick={() => void startEnrichment(films)}>Resume</Button>
+        <span>{t('posters.unchecked', { count: unchecked })}</span>
+        <Button onClick={() => void startEnrichment(films)}>{t('posters.resume')}</Button>
       </div>
     )
   }
@@ -74,7 +76,7 @@ export function EnrichmentStatus({ onOpenSettings, films: pageFilms, noKeyMessag
   if (missing > 0) {
     return (
       <p className="text-xs text-muted">
-        {missing} film{missing > 1 ? 's' : ''} without a poster (shown as title cards). Click any film to fix its match.
+        {t('posters.missing', { count: missing })}
       </p>
     )
   }

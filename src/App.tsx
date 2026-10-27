@@ -5,6 +5,8 @@ import { MatchDialog } from './components/MatchDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Toast } from './components/Toast'
 import { useHydrated } from './hooks'
+import { Trans } from './i18n/Trans'
+import { localeOf, useT } from './i18n'
 import { TierListPage } from './pages/TierListPage'
 import { useRoute } from './router'
 import { startEnrichment } from './store/enrichment'
@@ -23,6 +25,8 @@ export default function App() {
   const route = useRoute()
   const films = useStore((s) => s.films)
   const tmdbKey = useStore((s) => s.tmdbKey)
+  const language = useStore((s) => s.language)
+  const t = useT()
   const [dialog, setDialog] = useState<DialogName>(null)
   const close = () => setDialog(null)
   const openSettings = () => setDialog('settings')
@@ -32,6 +36,12 @@ export default function App() {
     if (hydrated && tmdbKey && films.length) void startEnrichment()
   }, [hydrated, tmdbKey, films])
 
+  // Keep <html lang> and the tab title in the chosen language.
+  useEffect(() => {
+    document.documentElement.lang = localeOf(language)
+    document.title = t('app.title')
+  }, [language, t])
+
   if (!hydrated) return null
 
   return (
@@ -39,7 +49,7 @@ export default function App() {
       <Header onSettings={openSettings} onExport={() => setDialog('export')} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-4 px-4 py-4">
-        <Suspense fallback={<p className="py-10 text-center text-muted">Loading…</p>}>
+        <Suspense fallback={<p className="py-10 text-center text-muted">{t('common.loading')}</p>}>
           {route.page === 'tierlist' && <TierListPage onOpenSettings={openSettings} />}
           {route.page === 'rooms' && <RoomsLobby />}
           {route.page === 'room' && <RoomPage key={route.roomId} roomId={route.roomId} linkPassword={route.password} onOpenSettings={openSettings} />}
@@ -50,16 +60,21 @@ export default function App() {
 
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">
         <p>
-          Film data and posters from{' '}
-          <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-lb-blue hover:underline">
-            TMDB
-          </a>
-          . This product uses the TMDB API but is not endorsed or certified by TMDB. Not affiliated with Letterboxd, TierMaker or UwUfufu.
+          <Trans
+            k="app.footerTmdb"
+            tags={{
+              tmdb: (text) => (
+                <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-lb-blue hover:underline">
+                  {text}
+                </a>
+              ),
+            }}
+          />
         </p>
         <p className="mt-1">
-          Your data stays in your browser ·{' '}
+          {t('app.footerPrivacy')} ·{' '}
           <a href="https://github.com/CreaTikaa/letterboxd2tierlist" target="_blank" rel="noreferrer" className="hover:text-text">
-            Source on GitHub
+            {t('app.footerSource')}
           </a>
         </p>
       </footer>

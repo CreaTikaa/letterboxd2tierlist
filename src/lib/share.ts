@@ -1,3 +1,4 @@
+import { AppError } from './errors'
 import type { Film, Match, Tier } from './types'
 
 /**
@@ -47,9 +48,9 @@ export async function decodeSharedList(code: string): Promise<SharedList> {
     const bytes = await transform(fromBase64Url(code), new DecompressionStream('deflate-raw'))
     wire = JSON.parse(new TextDecoder().decode(bytes))
   } catch {
-    throw new Error('This link is broken or incomplete.')
+    throw new AppError('brokenLink', 'This link is broken or incomplete.')
   }
-  if (!Array.isArray(wire) || wire[0] !== 1) throw new Error('This link was made by a newer version of the app.')
+  if (!Array.isArray(wire) || wire[0] !== 1) throw new AppError('newerLink', 'This link was made by a newer version of the app.')
   return {
     title: wire[1],
     tiers: wire[2].map(([label, color, films]) => ({

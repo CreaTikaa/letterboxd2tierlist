@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useT } from '../../i18n'
 import { memberColor } from '../../lib/room/group'
 import type { Film } from '../../lib/types'
 import { importFromFiles } from '../../store/importFromFiles'
@@ -23,6 +24,7 @@ export function MembersPanel() {
   const library = useStore((s) => s.films)
   const inputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
+  const t = useT()
 
   const { members } = view.state
   const people = new Map<string, Person>()
@@ -53,12 +55,12 @@ export function MembersPanel() {
               {(person.name || '?').slice(0, 1).toUpperCase()}
             </span>
             <span className="font-medium">
-              {person.name || 'Anonymous'}
-              {person.memberId === profile.memberId && <span className="text-muted"> (you)</span>}
+              {person.name || t('common.anonymous')}
+              {person.memberId === profile.memberId && <span className="text-muted"> {t('members.you')}</span>}
             </span>
-            {view.hostMemberId === person.memberId && <span className="rounded bg-raised px-1.5 text-[10px] tracking-wide text-muted uppercase">host</span>}
-            <span className="text-xs text-muted">{person.films == null ? 'no films yet' : `${person.films} films`}</span>
-            <span className={`size-2 rounded-full ${person.online ? 'bg-lb-green' : 'bg-line'}`} title={person.online ? 'Online' : 'Offline'} />
+            {view.hostMemberId === person.memberId && <span className="rounded bg-raised px-1.5 text-[10px] tracking-wide text-muted uppercase">{t('members.host')}</span>}
+            <span className="text-xs text-muted">{person.films == null ? t('members.noFilms') : t('common.films', { count: person.films })}</span>
+            <span className={`size-2 rounded-full ${person.online ? 'bg-lb-green' : 'bg-line'}`} title={person.online ? t('members.online') : t('members.offline')} />
           </div>
         ))}
       </div>
@@ -66,9 +68,9 @@ export function MembersPanel() {
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {library.length === 0 ? (
           <>
-            <span className="text-muted">Import your Letterboxd export to add your films:</span>
+            <span className="text-muted">{t('members.importPrompt')}</span>
             <Button variant="primary" disabled={importing} onClick={() => inputRef.current?.click()}>
-              {importing ? 'Reading…' : 'Import & share'}
+              {importing ? t('members.reading') : t('members.importAndShare')}
             </Button>
             <input
               ref={inputRef}
@@ -84,21 +86,21 @@ export function MembersPanel() {
           </>
         ) : !mine ? (
           <>
-            <span className="text-muted">Your ratings are visible to everyone in the room once shared.</span>
+            <span className="text-muted">{t('members.shareNote')}</span>
             <Button variant="primary" onClick={() => share()}>
-              Share my {library.length} films
+              {t('members.share', { count: library.length })}
             </Button>
           </>
         ) : (
           <>
-            <span className="text-muted">You're sharing {mine.films.length} films.</span>
+            <span className="text-muted">{t('members.sharing', { count: mine.films.length })}</span>
             {mine.films.length !== library.length && (
-              <Button onClick={() => share()} title="Your library changed since you shared it">
-                Update to {library.length} films
+              <Button onClick={() => share()} title={t('members.updateTitle')}>
+                {t('members.update', { count: library.length })}
               </Button>
             )}
-            <Button variant="ghost" onClick={() => confirm('Remove your films from this room?') && dispatch({ t: 'member-remove', memberId: profile.memberId })}>
-              Remove my films
+            <Button variant="ghost" onClick={() => confirm(t('members.removeConfirm')) && dispatch({ t: 'member-remove', memberId: profile.memberId })}>
+              {t('members.remove')}
             </Button>
           </>
         )}

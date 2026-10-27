@@ -1,6 +1,7 @@
 import { get, set } from 'idb-keyval'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { t } from '../i18n'
 import { autoResolve } from '../lib/room/groupTournament'
 import { RoomSession, type SessionView } from '../lib/room/session'
 import type { Op, RoomState } from '../lib/room/types'
@@ -105,7 +106,7 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
     const current = new RoomSession(transport, {
       roomId,
       memberId: profile.memberId,
-      name: profile.name || 'Anonymous',
+      name: profile.name || t('common.anonymous'),
       initialState: saved,
       creating: createdRooms.has(roomId),
       onChange: (view) => {
@@ -131,7 +132,7 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
 
     // Share poster matches found (or fixed by hand) here with the rest of the room.
     const unsubscribe = useStore.subscribe((state, previous) => {
-      if (state.profile.name !== previous.profile.name) current.setName(state.profile.name || 'Anonymous')
+      if (state.profile.name !== previous.profile.name) current.setName(state.profile.name || t('common.anonymous'))
       if (receiving || state.matches === previous.matches) return
       const roomFilmIds = new Set(Object.values(getState().view?.state.members ?? {}).flatMap((m) => m.films.map((f) => f.id)))
       const changed: Record<string, Match> = {}

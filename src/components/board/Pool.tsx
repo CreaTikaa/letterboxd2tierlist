@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { useState } from 'react'
+import { useT, type TKey } from '../../i18n'
 import type { Film, Match, PoolSort } from '../../lib/types'
 import { Button, inputClass } from '../ui'
 import { PoolPoster, type CardOptions } from './PosterCard'
@@ -9,11 +10,11 @@ export const POOL_ID = 'pool'
 /** Rendering thousands of draggable posters makes every drag sluggish, so big pools show a page at a time. */
 const PAGE = 300
 
-const SORT_LABELS: Record<PoolSort, string> = {
-  rating: 'Highest rated',
-  watched: 'Recently watched',
-  year: 'Newest release',
-  title: 'Title A–Z',
+const SORT_LABELS: Record<PoolSort, TKey> = {
+  rating: 'pool.sortRating',
+  watched: 'pool.sortWatched',
+  year: 'pool.sortYear',
+  title: 'pool.sortTitle',
 }
 
 interface Props {
@@ -28,20 +29,21 @@ interface Props {
 export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPoolSortChange }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: POOL_ID })
   const [limit, setLimit] = useState(PAGE)
+  const t = useT()
   const shown = filmIds.slice(0, limit)
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">
-          Unplaced <span className="font-normal text-muted">({filmIds.length})</span>
+          {t('pool.title')} <span className="font-normal text-muted">({filmIds.length})</span>
         </h2>
         <label className="flex items-center gap-2 text-sm text-muted">
-          Sort
+          {t('pool.sort')}
           <select value={poolSort} onChange={(e) => onPoolSortChange(e.target.value as PoolSort)} className={inputClass}>
             {Object.entries(SORT_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
@@ -52,7 +54,7 @@ export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPool
         data-pool
         className={`flex min-h-32 flex-wrap content-start gap-0.5 rounded-lg border border-dashed p-1 transition ${isOver ? 'border-lb-green bg-lb-green/5' : 'border-line'}`}
       >
-        {filmIds.length === 0 && <p className="m-auto p-6 text-sm text-muted">Every film is on the board. Drag one here to take it off.</p>}
+        {filmIds.length === 0 && <p className="m-auto p-6 text-sm text-muted">{t('pool.empty')}</p>}
         {shown.map((id) => {
           const film = filmById.get(id)
           return film ? <PoolPoster key={id} film={film} match={matches[id]} options={cardOptions} /> : null
@@ -61,10 +63,10 @@ export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPool
       {filmIds.length > shown.length && (
         <div className="flex justify-center gap-2">
           <Button variant="ghost" onClick={() => setLimit(limit + PAGE)}>
-            Show {Math.min(PAGE, filmIds.length - shown.length)} more
+            {t('pool.showMore', { count: Math.min(PAGE, filmIds.length - shown.length) })}
           </Button>
           <Button variant="ghost" onClick={() => setLimit(filmIds.length)}>
-            Show all {filmIds.length}
+            {t('pool.showAll', { count: filmIds.length })}
           </Button>
         </div>
       )}

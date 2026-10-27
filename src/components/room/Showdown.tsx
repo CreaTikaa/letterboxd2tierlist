@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { anonymousOrder, groupFilms, guessResults, listLabel, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
+import { anonymousOrder, groupFilms, guessResults, listLetter, pickShowdownFilms, showdownResults, type GroupFilm } from '../../lib/room/group'
+import { useT } from '../../i18n'
+import { Trans } from '../../i18n/Trans'
 import type { ShowdownMode, Showdown as ShowdownState } from '../../lib/room/types'
 import { autoFill, clearTiers, defaultRatingMap, placedIds } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
@@ -11,8 +13,6 @@ import { StaticTierList } from '../StaticTierList'
 import { Button, inputClass } from '../ui'
 import { MemberTag } from './names'
 import { useNameOf } from './useNameOf'
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export function Showdown() {
   const view = useRoom((s) => s.view)!
@@ -33,6 +33,7 @@ export function Showdown() {
 }
 
 function Setup({ films }: { films: GroupFilm[] }) {
+  const t = useT()
   const view = useRoom((s) => s.view)!
   const dispatch = useRoom((s) => s.dispatch)
   const nameOf = useNameOf()
@@ -51,47 +52,46 @@ function Setup({ films }: { films: GroupFilm[] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
       <div className="space-y-3 rounded-xl bg-panel p-5">
-        <h2 className="text-lg font-semibold">How a showdown works</h2>
+        <h2 className="text-lg font-semibold">{t('showdown.howTitle')}</h2>
         <ol className="list-inside list-decimal space-y-1.5 text-sm text-muted">
-          <li>Everyone gets the same set of films and ranks them on their own board, in secret.</li>
-          <li>Once people lock in, the host reveals every list at once.</li>
-          <li>Everyone votes for the best and the worst list (not their own).</li>
-          <li>See who won, and which films split the room.</li>
+          <li>{t('showdown.how1')}</li>
+          <li>{t('showdown.how2')}</li>
+          <li>{t('showdown.how3')}</li>
+          <li>{t('showdown.how4')}</li>
         </ol>
         <p className="text-sm text-muted">
-          <span className="font-semibold text-text">Guess whose list:</span> the lists are revealed without names, and everyone also guesses who made each one.
-          Names are revealed with the results, along with who guessed best.
+          <Trans k="showdown.guessExplain" tags={{ b: (text) => <span className="font-semibold text-text">{text}</span> }} />
         </p>
       </div>
 
       <div className="space-y-4 rounded-xl bg-panel p-5">
         {view.isHost ? (
           <>
-            <h2 className="text-lg font-semibold">Start a showdown</h2>
+            <h2 className="text-lg font-semibold">{t('showdown.startTitle')}</h2>
             {sharing === 0 ? (
-              <p className="text-sm text-muted">Someone needs to share their films first.</p>
+              <p className="text-sm text-muted">{t('showdown.needFilms')}</p>
             ) : (
               <>
                 <div className="grid gap-3 text-sm sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-muted">
-                    Mode
+                    {t('showdown.mode')}
                     <select value={showdownMode} onChange={(e) => setShowdownMode(e.target.value as ShowdownMode)} className={inputClass}>
-                      <option value="classic">Classic (names shown)</option>
-                      <option value="guess">Guess whose list (anonymous)</option>
+                      <option value="classic">{t('showdown.modeClassic')}</option>
+                      <option value="guess">{t('showdown.modeGuess')}</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-muted">
-                    Films seen by at least
+                    {t('showdown.seenBy')}
                     <select value={minWatchers} onChange={(e) => setMinWatchers(Number(e.target.value))} className={inputClass}>
                       {Array.from({ length: sharing }, (_, i) => i + 1).map((n) => (
                         <option key={n} value={n}>
-                          {n === sharing && n > 1 ? `${n} (everyone)` : `${n} ${n === 1 ? 'person' : 'people'}`}
+                          {n === sharing && n > 1 ? t('showdown.everyone', { count: n }) : t('showdown.people', { count: n })}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-muted">
-                    Number of films
+                    {t('showdown.filmCount')}
                     <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={inputClass}>
                       {[10, 15, 20, 30, 40, 50].map((n) => (
                         <option key={n} value={n}>
@@ -101,25 +101,25 @@ function Setup({ films }: { films: GroupFilm[] }) {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-muted">
-                    Pick
+                    {t('showdown.pick')}
                     <select value={mode} onChange={(e) => setMode(e.target.value as 'popular' | 'random')} className={inputClass}>
-                      <option value="popular">Most watched</option>
-                      <option value="random">Random</option>
+                      <option value="popular">{t('showdown.pickPopular')}</option>
+                      <option value="random">{t('showdown.pickRandom')}</option>
                     </select>
                   </label>
                 </div>
                 <p className="text-sm text-muted">
-                  {available} films qualify; {Math.min(available, count)} will be used. Tiers are copied from the group board.
+                  {t('showdown.qualify', { available, used: Math.min(available, count) })}
                 </p>
                 <Button variant="primary" disabled={available < 2} onClick={start}>
-                  Start showdown
+                  {t('showdown.start')}
                 </Button>
               </>
             )}
           </>
         ) : (
           <p className="text-sm text-muted">
-            Waiting for the host ({view.hostMemberId ? nameOf(view.hostMemberId) : 'connecting…'}) to start a showdown.
+            {t('showdown.waitingHost', { host: view.hostMemberId ? nameOf(view.hostMemberId) : t('showdown.connecting') })}
           </p>
         )}
       </div>
@@ -128,6 +128,7 @@ function Setup({ films }: { films: GroupFilm[] }) {
 }
 
 function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Map<string, GroupFilm> }) {
+  const t = useT()
   const view = useRoom((s) => s.view)!
   const dispatch = useRoom((s) => s.dispatch)
   const me = useStore((s) => s.profile.memberId)
@@ -154,13 +155,13 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
   const lockedIds = Object.keys(showdown.boards)
 
   const lock = () => {
-    if (unplaced > 0 && !confirm(`${unplaced} films are still unplaced. Lock in anyway?`)) return
+    if (unplaced > 0 && !confirm(t('showdown.lockConfirm', { count: unplaced }))) return
     dispatch({ t: 'sd-lock', memberId: me, tiers })
   }
 
   const reveal = () => {
     const waiting = online.filter((id) => !showdown.boards[id]).length
-    if (waiting > 0 && !confirm(`${waiting} people haven't locked in. Reveal anyway? Their lists won't be included.`)) return
+    if (waiting > 0 && !confirm(t('showdown.revealConfirm', { count: waiting }))) return
     dispatch({ t: 'sd-phase', phase: 'reveal' })
   }
 
@@ -168,16 +169,16 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-panel p-4 text-sm">
         <div className="space-y-1">
-          <p className="font-semibold">Rank these {films.length} films. Your list stays hidden until the reveal.</p>
+          <p className="font-semibold">{t('showdown.rankThese', { count: films.length })}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {[...new Set([...online, ...lockedIds])].map((id) => (
-              <MemberTag key={id} memberId={id} suffix={showdown.boards[id] ? '✓ locked in' : 'ranking…'} />
+              <MemberTag key={id} memberId={id} suffix={showdown.boards[id] ? t('showdown.lockedIn') : t('showdown.ranking')} />
             ))}
           </div>
         </div>
         {view.isHost && (
-          <Button variant="primary" disabled={lockedIds.length < 2} onClick={reveal} title={lockedIds.length < 2 ? 'Needs at least two locked-in lists' : undefined}>
-            Reveal lists ({lockedIds.length})
+          <Button variant="primary" disabled={lockedIds.length < 2} onClick={reveal} title={lockedIds.length < 2 ? t('showdown.revealNeedsTwo') : undefined}>
+            {t('showdown.reveal', { count: lockedIds.length })}
           </Button>
         )}
       </div>
@@ -185,9 +186,9 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
       {locked ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <p className="font-semibold text-lb-green">✓ Locked in. Waiting for the reveal.</p>
+            <p className="font-semibold text-lb-green">{t('showdown.lockedWaiting')}</p>
             <Button variant="ghost" onClick={() => dispatch({ t: 'sd-lock', memberId: me, tiers: null })}>
-              Unlock to edit
+              {t('showdown.unlock')}
             </Button>
           </div>
           <StaticTierList tiers={locked} filmById={ownFilmById} matches={matches} cardWidth={56} onFilmClick={openFilm} />
@@ -202,10 +203,10 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
           onPoolSortChange={setPoolSort}
           onAutoFill={() => onTiersChange(autoFill(tiers, films, defaultRatingMap(tiers)))}
           onFilmClick={openFilm}
-          hint={unplaced ? `${unplaced} left to place` : 'All placed!'}
+          hint={unplaced ? t('showdown.leftToPlace', { count: unplaced }) : t('showdown.allPlaced')}
           toolbar={
             <Button variant="primary" onClick={lock}>
-              Lock in my list
+              {t('showdown.lockIn')}
             </Button>
           }
         />
@@ -249,6 +250,7 @@ function BoardCard({
 }
 
 function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map<string, GroupFilm> }) {
+  const t = useT()
   const view = useRoom((s) => s.view)!
   const dispatch = useRoom((s) => s.dispatch)
   const me = useStore((s) => s.profile.memberId)
@@ -275,15 +277,14 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-panel p-4 text-sm">
         <p>
-          <span className="font-semibold">The lists are in!</span>{' '}
-          {guessing ? 'Guess who made each list, and vote for the best 👑 and the worst 💀.' : 'Vote for the best 👑 and the worst 💀 list.'}{' '}
+          <span className="font-semibold">{t('showdown.listsIn')}</span> {guessing ? t('showdown.guessAndVote') : t('showdown.vote')}{' '}
           <span className="text-muted">
-            {voters} of {online} voted{guessing && ` · ${doneGuessing} finished guessing`}.
+            {guessing ? t('showdown.votedGuessing', { voters, online, done: doneGuessing }) : t('showdown.voted', { voters, online })}
           </span>
         </p>
         {view.isHost && (
           <Button variant="primary" onClick={() => dispatch({ t: 'sd-phase', phase: 'results' })}>
-            Show results
+            {t('showdown.showResults')}
           </Button>
         )}
       </div>
@@ -292,7 +293,14 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
           <BoardCard
             key={memberId}
             memberId={memberId}
-            title={guessing ? <span className="font-semibold">{listLabel(index)}{memberId === me && <span className="font-normal text-muted"> (yours)</span>}</span> : undefined}
+            title={
+              guessing ? (
+                <span className="font-semibold">
+                  {t('showdown.listLabel', { letter: listLetter(index) })}
+                  {memberId === me && <span className="font-normal text-muted"> {t('showdown.yours')}</span>}
+                </span>
+              ) : undefined
+            }
             tiers={showdown.boards[memberId]}
             filmById={filmById}
             matches={matches}
@@ -301,13 +309,13 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
               guessing &&
               memberId !== me && (
                 <label className="flex items-center gap-2 text-sm text-muted">
-                  Who made this?
+                  {t('showdown.whoMade')}
                   <select
                     value={myGuesses[memberId] ?? ''}
                     onChange={(e) => dispatch({ t: 'sd-guess', memberId: me, ownerId: memberId, guessId: e.target.value || null })}
                     className={`${inputClass} flex-1`}
                   >
-                    <option value="">Pick someone…</option>
+                    <option value="">{t('showdown.pickSomeone')}</option>
                     {others.map((id) => (
                       <option key={id} value={id}>
                         {nameOf(id)}
@@ -319,14 +327,14 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
             }
           >
             {memberId === me ? (
-              <span className="text-xs text-muted">your list</span>
+              <span className="text-xs text-muted">{t('showdown.yourList')}</span>
             ) : (
               <div className="flex gap-1">
                 <Button variant={vote.best === memberId ? 'primary' : 'secondary'} className="!px-2 !py-1 text-xs" onClick={() => castVote('best', memberId)}>
-                  👑 Best
+                  {t('showdown.best')}
                 </Button>
                 <Button variant={vote.worst === memberId ? 'danger' : 'secondary'} className="!px-2 !py-1 text-xs" onClick={() => castVote('worst', memberId)}>
-                  💀 Worst
+                  {t('showdown.worst')}
                 </Button>
               </div>
             )}
@@ -338,6 +346,7 @@ function Reveal({ showdown, filmById }: { showdown: ShowdownState; filmById: Map
 }
 
 function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Map<string, GroupFilm> }) {
+  const t = useT()
   const view = useRoom((s) => s.view)!
   const dispatch = useRoom((s) => s.dispatch)
   const matches = useStore((s) => s.matches)
@@ -351,42 +360,41 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
   const topWorst = results.worst.filter((w) => w.votes === results.worst[0]?.votes)
   const boards = Object.entries(showdown.boards)
 
-  const tierLabel = (tiers: Tier[], filmId: string) => tiers.find((t) => t.filmIds.includes(filmId))?.label ?? '–'
+  const tierLabel = (tiers: Tier[], filmId: string) => tiers.find((tier) => tier.filmIds.includes(filmId))?.label ?? '–'
+  const names = (ids: string[]) => ids.map(nameOf).reduce((a, b) => t('showdown.and', { a, b }))
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-lb-green/40 bg-lb-green/10 p-5 text-center">
-          <p className="text-sm tracking-wide text-muted uppercase">👑 Best list</p>
-          <p className="mt-1 text-2xl font-bold">{topBest.length ? topBest.map((b) => nameOf(b.memberId)).join(' & ') : 'No votes'}</p>
-          {topBest[0] && <p className="text-sm text-muted">{plural(topBest[0].votes, 'vote')}</p>}
+          <p className="text-sm tracking-wide text-muted uppercase">{t('showdown.bestList')}</p>
+          <p className="mt-1 text-2xl font-bold">{topBest.length ? names(topBest.map((b) => b.memberId)) : t('showdown.noVotes')}</p>
+          {topBest[0] && <p className="text-sm text-muted">{t('showdown.votes', { count: topBest[0].votes })}</p>}
         </div>
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-5 text-center">
-          <p className="text-sm tracking-wide text-muted uppercase">💀 Worst list</p>
-          <p className="mt-1 text-2xl font-bold">{topWorst.length ? topWorst.map((w) => nameOf(w.memberId)).join(' & ') : 'No votes'}</p>
-          {topWorst[0] && <p className="text-sm text-muted">{plural(topWorst[0].votes, 'vote')}</p>}
+          <p className="text-sm tracking-wide text-muted uppercase">{t('showdown.worstList')}</p>
+          <p className="mt-1 text-2xl font-bold">{topWorst.length ? names(topWorst.map((w) => w.memberId)) : t('showdown.noVotes')}</p>
+          {topWorst[0] && <p className="text-sm text-muted">{t('showdown.votes', { count: topWorst[0].votes })}</p>}
         </div>
       </div>
 
       {guesses && guesses.detectives.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 rounded-xl bg-panel p-4">
-            <h3 className="font-semibold">🕵️ Best detectives</h3>
+            <h3 className="font-semibold">{t('showdown.detectives')}</h3>
             {guesses.detectives.map(({ memberId, correct, total }) => (
               <p key={memberId} className="flex items-center justify-between text-sm">
                 <MemberTag memberId={memberId} suffix={correct > 0 && correct === guesses.detectives[0].correct ? '🏅' : undefined} />
-                <span className="text-muted">
-                  {correct} / {total} right
-                </span>
+                <span className="text-muted">{t('showdown.right', { correct, total })}</span>
               </p>
             ))}
           </div>
           <div className="space-y-2 rounded-xl bg-panel p-4">
-            <h3 className="font-semibold">🎭 Easiest list to recognise</h3>
+            <h3 className="font-semibold">{t('showdown.recognisable')}</h3>
             {guesses.recognised.map(({ ownerId, correct, guessers }) => (
               <p key={ownerId} className="flex items-center justify-between text-sm">
                 <MemberTag memberId={ownerId} />
-                <span className="text-muted">{guessers ? `${correct} of ${guessers} guessed it` : 'no guesses'}</span>
+                <span className="text-muted">{guessers ? t('showdown.guessedIt', { correct, guessers }) : t('showdown.noGuesses')}</span>
               </p>
             ))}
           </div>
@@ -395,7 +403,7 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
 
       {results.controversial.length > 0 && (
         <div className="space-y-2">
-          <h3 className="font-semibold">Most divisive films</h3>
+          <h3 className="font-semibold">{t('showdown.divisive')}</h3>
           <div className="flex gap-3 overflow-x-auto pb-2">
             {results.controversial.slice(0, 6).map(({ filmId }) => {
               const film = filmById.get(filmId)
@@ -419,12 +427,13 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
 
       {results.unanimous.length > 0 && (
         <p className="text-sm text-muted">
-          Everyone agreed on{' '}
-          {results.unanimous
-            .slice(0, 8)
-            .map(({ filmId, tierIndex }) => `${filmById.get(filmId)?.name ?? '?'} (${showdown.tiers[tierIndex]?.label ?? '?'})`)
-            .join(', ')}
-          {results.unanimous.length > 8 && ` and ${results.unanimous.length - 8} more`}.
+          {t(results.unanimous.length > 8 ? 'showdown.agreedMore' : 'showdown.agreed', {
+            films: results.unanimous
+              .slice(0, 8)
+              .map(({ filmId, tierIndex }) => `${filmById.get(filmId)?.name ?? '?'} (${showdown.tiers[tierIndex]?.label ?? '?'})`)
+              .join(', '),
+            count: results.unanimous.length - 8,
+          })}
         </p>
       )}
 
@@ -440,7 +449,7 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
               title={
                 guessing ? (
                   <span className="inline-flex items-center gap-2">
-                    <span className="text-muted">{listLabel(index)} was</span> <MemberTag memberId={memberId} />
+                    <span className="text-muted">{t('showdown.listWas', { letter: listLetter(index) })}</span> <MemberTag memberId={memberId} />
                   </span>
                 ) : undefined
               }
@@ -472,7 +481,7 @@ function Results({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
 
       {view.isHost && (
         <Button variant="primary" onClick={() => dispatch({ t: 'sd-phase', phase: 'idle' })}>
-          New showdown
+          {t('showdown.newShowdown')}
         </Button>
       )}
     </div>

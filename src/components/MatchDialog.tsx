@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { stars } from '../lib/ratings'
+import { errorMessage, useLocale, useT } from '../i18n'
+import { Trans } from '../i18n/Trans'
+import { averageText, stars } from '../lib/ratings'
 import { memberColor, type GroupFilm } from '../lib/room/group'
 import type { Film } from '../lib/types'
 import { useRoom } from '../store/useRoom'
@@ -17,15 +19,21 @@ function parseTmdbId(text: string): number | null {
 /** Each room member's rating for a film. */
 function GroupRatings({ film }: { film: GroupFilm }) {
   const members = useRoom((s) => s.view?.state.members ?? {})
+  const t = useT()
+  const locale = useLocale()
   return (
     <div className="space-y-0.5">
       <p>
-        Group average: <span className="text-lb-green">{film.average == null ? 'unrated' : `${film.average.toFixed(2)}★`}</span>
+        <Trans
+          k="film.groupAverage"
+          params={{ value: film.average == null ? t('common.unrated') : averageText(film.average, locale, 2) }}
+          tags={{ b: (text) => <span className="text-lb-green">{text}</span> }}
+        />
       </p>
       {Object.entries(film.ratings).map(([memberId, rating]) => (
         <p key={memberId} className="flex items-center gap-1.5 text-muted">
           <span className="size-2 rounded-full" style={{ background: memberColor(memberId) }} />
-          {members[memberId]?.name ?? 'Someone'}: <span className="text-lb-green">{stars(rating)}</span>
+          {members[memberId]?.name ?? t('common.someone')}: <span className="text-lb-green">{rating == null ? t('common.unrated') : stars(rating)}</span>
         </p>
       ))}
     </div>
@@ -39,6 +47,7 @@ export function MatchDialog() {
 }
 
 function MatchContent({ film }: { film: Film }) {
+  const t = useT()
   const setEditingFilm = useStore((s) => s.setEditingFilm)
   const match = useStore((s) => s.matches[film.id])
   const tmdbKey = useStore((s) => s.tmdbKey)
@@ -58,7 +67,7 @@ function MatchContent({ film }: { film: Film }) {
       const id = parseTmdbId(query)
       setResults(id ? [await getMovie(tmdbKey, id)] : await searchMovies(tmdbKey, query))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Search failed')
+      setError(errorMessage(t, e))
     } finally {
       setBusy(false)
     }
@@ -72,7 +81,7 @@ function MatchContent({ film }: { film: Film }) {
   const current = match?.status === 'matched' ? match : null
 
   return (
-    <Dialog open onClose={close} title="Film details" wide>
+    <Dialog open onClose={close} title={t('film.title')} wide>
       <div className="space-y-5">
         <div className="flex gap-4">
           <div className="h-36 w-24 shrink-0 overflow-hidden rounded bg-raised">
@@ -82,31 +91,31 @@ function MatchContent({ film }: { film: Film }) {
             <p className="text-lg font-semibold text-text">
               {film.name} {film.year && <span className="font-normal text-muted">({film.year})</span>}
             </p>
-            {'ratings' in film ? <GroupRatings film={film as GroupFilm} /> : <p className="text-lb-green">{stars(film.rating)}</p>}
+            {'ratings' in film ? <GroupRatings film={film as GroupFilm} /> : <p className="text-lb-green">{film.rating == null ? t('common.unrated') : stars(film.rating)}</p>}
             {film.uri && (
               <a href={film.uri} target="_blank" rel="noreferrer" className="block text-lb-blue hover:underline">
-                Open on Letterboxd ↗
+                {t('film.openLetterboxd')}
               </a>
             )}
             <p className="text-muted">
-              TMDB match:{' '}
+              {t('film.tmdbMatch')}{' '}
               {current ? (
                 <a href={`https://www.themoviedb.org/movie/${current.tmdbId}`} target="_blank" rel="noreferrer" className="text-text hover:underline">
                   {current.title} {current.year && `(${current.year})`}
                 </a>
               ) : match?.status === 'notfound' ? (
-                'not found'
+                t('film.notFound')
               ) : (
-                'not looked up yet'
+                t('film.notLookedUp')
               )}
-              {current?.manual && ' · picked by hand'}
+              {current?.manual && ` · ${t('film.pickedByHand')}`}
             </p>
           </div>
         </div>
 
         {tmdbKey ? (
           <div className="space-y-3">
-            <p className="text-sm font-semibold">Wrong poster? Pick the right film:</p>
+            <p className="text-sm font-semibold">{t('film.wrongPoster')}</p>
             <form
               className="flex gap-2"
               onSubmit={(e) => {
@@ -114,22 +123,22 @@ function MatchContent({ film }: { film: Film }) {
                 void search()
               }}
             >
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Title, TMDB id or TMDB URL" className={`${inputClass} min-w-0 flex-1`} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('film.searchPlaceholder')} className={`${inputClass} min-w-0 flex-1`} />
               <Button type="submit" variant="primary" disabled={busy || !query.trim()}>
-                {busy ? 'Searching…' : 'Search'}
+                {busy ? t('film.searching') : t('film.search')}
               </Button>
             </form>
             {error && <p className="text-sm text-red-400">{error}</p>}
-            {results && results.length === 0 && <p className="text-sm text-muted">No results.</p>}
+            {results && results.length === 0 && <p className="text-sm text-muted">{t('film.noResults')}</p>}
             {results && results.length > 0 && (
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {results.slice(0, 15).map((movie) => (
-                  <button key={movie.id} type="button" onClick={() => choose(movie)} className="group space-y-1 text-left" title="Use this film">
+                  <button key={movie.id} type="button" onClick={() => choose(movie)} className="group space-y-1 text-left" title={t('film.useThis')}>
                     <div className="aspect-[2/3] overflow-hidden rounded bg-raised ring-lb-green group-hover:ring-2">
                       {movie.poster_path ? (
                         <img src={posterUrl(movie.poster_path, 'w185')} alt="" loading="lazy" className="size-full object-cover" />
                       ) : (
-                        <div className="flex size-full items-center justify-center p-1 text-center text-xs text-muted">No poster</div>
+                        <div className="flex size-full items-center justify-center p-1 text-center text-xs text-muted">{t('film.noPoster')}</div>
                       )}
                     </div>
                     <p className="line-clamp-2 text-xs">
@@ -146,11 +155,11 @@ function MatchContent({ film }: { film: Film }) {
                 close()
               }}
             >
-              Use a title card instead of a poster
+              {t('film.useTitleCard')}
             </Button>
           </div>
         ) : (
-          <p className="text-sm text-muted">Add a TMDB key in Settings to search for posters.</p>
+          <p className="text-sm text-muted">{t('film.needKey')}</p>
         )}
       </div>
     </Dialog>

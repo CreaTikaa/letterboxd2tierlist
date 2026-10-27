@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
+import { useT } from '../../i18n'
 import { textColorFor } from '../../lib/export/canvas'
 import type { Film, Match, Tier } from '../../lib/types'
 import { SortablePoster, type CardOptions } from './PosterCard'
@@ -21,6 +22,7 @@ const iconButton = 'rounded px-1.5 py-0.5 text-muted hover:bg-raised hover:text-
 
 export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst, isLast, onUpdate, onMove, onRemove }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: tier.id })
+  const t = useT()
   const minHeight = Math.round(cardOptions.width * 1.5)
 
   return (
@@ -30,7 +32,7 @@ export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst
           value={tier.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
           rows={1}
-          aria-label="Tier name"
+          aria-label={t('board.tierName')}
           className="field-sizing-content w-full resize-none bg-transparent text-center text-lg leading-tight font-semibold outline-none focus:bg-black/10 sm:text-xl"
           style={{ color: textColorFor(tier.color) }}
         />
@@ -46,24 +48,24 @@ export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst
       </SortableContext>
 
       <div className="flex w-9 shrink-0 flex-col items-center justify-center gap-0.5 bg-panel text-xs opacity-60 transition group-hover:opacity-100">
-        <button type="button" className={iconButton} disabled={isFirst} onClick={() => onMove(-1)} aria-label="Move tier up" title="Move up">
+        <button type="button" className={iconButton} disabled={isFirst} onClick={() => onMove(-1)} aria-label={t('board.moveTierUp')} title={t('board.moveUp')}>
           ▲
         </button>
-        <label className="flex size-6 items-center justify-center" title="Tier colour">
-          <input type="color" value={tier.color} onChange={(e) => onUpdate({ color: e.target.value })} className="size-4" aria-label="Tier colour" />
+        <label className="flex size-6 items-center justify-center" title={t('board.tierColor')}>
+          <input type="color" value={tier.color} onChange={(e) => onUpdate({ color: e.target.value })} className="size-4" aria-label={t('board.tierColor')} />
         </label>
         <button
           type="button"
           className={iconButton}
           onClick={() => {
-            if (!tier.filmIds.length || confirm(`Delete tier "${tier.label}"? Its ${tier.filmIds.length} films go back to the pool.`)) onRemove()
+            if (!tier.filmIds.length || confirm(t('board.deleteTierConfirm', { label: tier.label, count: tier.filmIds.length }))) onRemove()
           }}
-          aria-label="Delete tier"
-          title="Delete tier"
+          aria-label={t('board.deleteTier')}
+          title={t('board.deleteTier')}
         >
           ✕
         </button>
-        <button type="button" className={iconButton} disabled={isLast} onClick={() => onMove(1)} aria-label="Move tier down" title="Move down">
+        <button type="button" className={iconButton} disabled={isLast} onClick={() => onMove(1)} aria-label={t('board.moveTierDown')} title={t('board.moveDown')}>
           ▼
         </button>
       </div>
