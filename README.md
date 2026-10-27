@@ -33,6 +33,12 @@ Rooms are **peer-to-peer** (WebRTC via [Trystero](https://github.com/dmotz/tryst
 - Optionally limit the bracket to one genre.
 - **Send to my tier list** turns the result into tiers: champion in S, runner-up in A, semi-finalists in B, and so on. In rooms, it sends the result to the group board.
 
+### Languages
+
+English, French, Simplified Chinese and Brazilian Portuguese. The app follows your browser's language, and you can switch it from the header or Settings. Everything is translated, including exported images and the TierMaker pack.
+
+To add a language, copy `src/i18n/fr.ts`, translate every message (TypeScript refuses to build if a key is missing or extra), and register it in `src/i18n/languages.ts` and `src/i18n/index.ts`. `src/i18n/i18n.test.ts` checks that placeholders and links match English.
+
 ## Using it
 
 1. On Letterboxd: **Settings → Import & Export → Export your data**. You get a ZIP.
@@ -67,6 +73,7 @@ src/
   lib/export/       PNG renderers, TierMaker ZIP, save files
   lib/room/         room state, ops, sync protocol (session.ts), group merging, showdown scoring, group tournament voting
   lib/tournament.ts bracket seeding, picks, standings
+  i18n/             translations (en.ts is the source), language detection, plural/ordinal helpers
   lib/share.ts      share links (tier list ⇄ compressed URL)
   lib/              filters, genres, tiers, rating helpers
   store/            Zustand stores (app, room session), poster lookup, import
