@@ -1,3 +1,5 @@
+import type { Credits } from '../types'
+
 const API = 'https://api.themoviedb.org/3'
 const IMAGES = 'https://image.tmdb.org/t/p'
 
@@ -75,6 +77,25 @@ export async function searchMovies(key: string, query: string, options: SearchOp
 
 export const getMovie = (key: string, id: number, signal?: AbortSignal) =>
   tmdbFetch<TmdbMovie>(`/movie/${id}`, {}, key, signal)
+
+const CAST_LIMIT = 10
+
+/** Directors and the top-billed cast of a film. */
+export async function getCredits(key: string, tmdbId: number, signal?: AbortSignal): Promise<Credits> {
+  const data = await tmdbFetch<{ cast?: { id: number; name: string; order?: number }[]; crew?: { id: number; name: string; job?: string }[] }>(
+    `/movie/${tmdbId}/credits`,
+    {},
+    key,
+    signal,
+  )
+  return {
+    directors: (data.crew ?? []).filter((p) => p.job === 'Director').map((p) => [p.id, p.name]),
+    cast: [...(data.cast ?? [])]
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .slice(0, CAST_LIMIT)
+      .map((p) => [p.id, p.name]),
+  }
+}
 
 export async function validateKey(key: string): Promise<void> {
   await tmdbFetch('/configuration', {}, key)

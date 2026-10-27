@@ -13,6 +13,8 @@ export interface CardOptions {
   /** Replaces the star rating strip at the bottom of the card. */
   badge?: (film: Film) => ReactNode
   onClick?: (film: Film) => void
+  /** Highlighted (tap-to-place). */
+  selectedId?: string | null
 }
 
 interface CardProps extends Omit<CardOptions, 'onClick'> {
@@ -34,7 +36,7 @@ export function PosterCard({ film, match, width, showRating, badge, lifted = fal
       className={`relative shrink-0 overflow-hidden rounded-[3px] bg-raised select-none ${lifted ? 'shadow-2xl ring-2 ring-lb-green' : ''}`}
     >
       {poster ? (
-        <img src={poster} alt={label} loading="lazy" draggable={false} className="size-full object-cover" />
+        <img src={poster} alt={label} loading="lazy" decoding="async" draggable={false} className="size-full object-cover" />
       ) : (
         <div className="flex size-full flex-col items-center justify-center gap-0.5 p-1 text-center leading-tight">
           <span className="line-clamp-4 font-semibold break-words" style={{ fontSize: Math.max(9, width / 8) }}>
@@ -61,12 +63,13 @@ interface ItemProps {
 /** Card inside a tier row: sortable within and across tiers. */
 export const SortablePoster = memo(function SortablePoster({ film, match, options }: ItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: film.id })
-  const { onClick, ...cardOptions } = options
+  const { onClick, selectedId, ...cardOptions } = options
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`cursor-grab touch-manipulation active:cursor-grabbing ${isDragging ? 'opacity-30' : ''}`}
+      data-selected={selectedId === film.id || undefined}
+      className={`cursor-grab touch-manipulation rounded-[3px] active:cursor-grabbing ${isDragging ? 'opacity-30' : ''} ${selectedId === film.id ? 'ring-2 ring-lb-blue ring-offset-1 ring-offset-ink' : ''}`}
       onClick={() => onClick?.(film)}
       {...attributes}
       {...listeners}
@@ -79,11 +82,12 @@ export const SortablePoster = memo(function SortablePoster({ film, match, option
 /** Card in the unplaced pool: draggable only, since the pool's order comes from its sort setting. */
 export const PoolPoster = memo(function PoolPoster({ film, match, options }: ItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: film.id })
-  const { onClick, ...cardOptions } = options
+  const { onClick, selectedId, ...cardOptions } = options
   return (
     <div
       ref={setNodeRef}
-      className={`cursor-grab touch-manipulation active:cursor-grabbing ${isDragging ? 'opacity-30' : ''}`}
+      data-selected={selectedId === film.id || undefined}
+      className={`cursor-grab touch-manipulation rounded-[3px] active:cursor-grabbing ${isDragging ? 'opacity-30' : ''} ${selectedId === film.id ? 'ring-2 ring-lb-blue ring-offset-1 ring-offset-ink' : ''}`}
       onClick={() => onClick?.(film)}
       {...attributes}
       {...listeners}

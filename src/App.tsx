@@ -6,7 +6,7 @@ import { SettingsDialog } from './components/SettingsDialog'
 import { Toast } from './components/Toast'
 import { useHydrated } from './hooks'
 import { Trans } from './i18n/Trans'
-import { localeOf, useT } from './i18n'
+import { localeOf, useLanguageReady, useT } from './i18n'
 import { TierListPage } from './pages/TierListPage'
 import { useRoute } from './router'
 import { startEnrichment } from './store/enrichment'
@@ -17,6 +17,8 @@ const RoomPage = lazy(() => import('./pages/RoomPage').then((m) => ({ default: m
 const RoomsLobby = lazy(() => import('./pages/RoomsLobby').then((m) => ({ default: m.RoomsLobby })))
 const TournamentPage = lazy(() => import('./pages/TournamentPage').then((m) => ({ default: m.TournamentPage })))
 const ViewPage = lazy(() => import('./pages/ViewPage').then((m) => ({ default: m.ViewPage })))
+const RankPage = lazy(() => import('./pages/RankPage').then((m) => ({ default: m.RankPage })))
+const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })))
 
 type DialogName = 'settings' | 'export' | null
 
@@ -26,6 +28,7 @@ export default function App() {
   const films = useStore((s) => s.films)
   const tmdbKey = useStore((s) => s.tmdbKey)
   const language = useStore((s) => s.language)
+  const languageReady = useLanguageReady(language)
   const t = useT()
   const [dialog, setDialog] = useState<DialogName>(null)
   const close = () => setDialog(null)
@@ -42,7 +45,8 @@ export default function App() {
     document.title = t('app.title')
   }, [language, t])
 
-  if (!hydrated) return null
+  // Wait for the saved data and the language's text, so nothing flashes in English first.
+  if (!hydrated || !languageReady) return null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -54,7 +58,9 @@ export default function App() {
           {route.page === 'rooms' && <RoomsLobby />}
           {route.page === 'room' && <RoomPage key={route.roomId} roomId={route.roomId} linkPassword={route.password} onOpenSettings={openSettings} />}
           {route.page === 'tournament' && <TournamentPage />}
-          {route.page === 'view' && <ViewPage code={route.code} />}
+          {route.page === 'view' && <ViewPage key={route.code} code={route.code} />}
+          {route.page === 'rank' && <RankPage />}
+          {route.page === 'compare' && <ComparePage key={`${route.a}/${route.b}`} a={route.a} b={route.b} />}
         </Suspense>
       </main>
 

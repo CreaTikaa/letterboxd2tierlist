@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { ordinal, translate } from '.'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { loadLanguage, ordinal, translate } from '.'
+
+beforeAll(async () => {
+  await Promise.all([loadLanguage('fr'), loadLanguage('zh'), loadLanguage('pt')])
+})
 
 describe('translate', () => {
   it('fills placeholders and picks plural forms per language', () => {

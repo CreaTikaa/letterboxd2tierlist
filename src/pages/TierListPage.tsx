@@ -1,11 +1,15 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AutoFillDialog } from '../components/AutoFillDialog'
 import { Board } from '../components/board/Board'
 import { EnrichmentStatus } from '../components/EnrichmentStatus'
 import { FilterBar } from '../components/FilterBar'
+import { SourceSelect } from '../components/SourceSelect'
 import { ImportPanel } from '../components/ImportPanel'
-import { useVisibleFilms } from '../hooks'
+import { useSourceFilms, useVisibleFilms } from '../hooks'
+import { useHistory } from '../hooks/useHistory'
+import { tiersEqual } from '../lib/tiers'
 import type { Film } from '../lib/types'
+import { startEnrichment } from '../store/enrichment'
 import { useStore } from '../store/useStore'
 
 export function TierListPage({ onOpenSettings }: { onOpenSettings: () => void }) {
@@ -20,7 +24,16 @@ export function TierListPage({ onOpenSettings }: { onOpenSettings: () => void })
   const poolSort = useStore((s) => s.poolSort)
   const setPoolSort = useStore((s) => s.setPoolSort)
   const setEditingFilm = useStore((s) => s.setEditingFilm)
+  const base = useSourceFilms()
   const visible = useVisibleFilms()
+  const tmdbKey = useStore((s) => s.tmdbKey)
+  const source = filters.source ?? 'all'
+
+  // A list can include films you haven't watched: look up their posters too.
+  useEffect(() => {
+    if (tmdbKey && source.startsWith('list:')) void startEnrichment(base)
+  }, [tmdbKey, source, base])
+  const history = useHistory(tiers, setTiers, tiersEqual)
   const [autoFillOpen, setAutoFillOpen] = useState(false)
   const openFilm = useCallback((film: Film) => setEditingFilm(film), [setEditingFilm])
 
@@ -28,13 +41,21 @@ export function TierListPage({ onOpenSettings }: { onOpenSettings: () => void })
 
   return (
     <>
-      <EnrichmentStatus onOpenSettings={onOpenSettings} />
-      <FilterBar films={films} filters={filters} onChange={setFilters} visibleCount={visible.length} matches={matches} />
+      <EnrichmentStatus onOpenSettings={onOpenSettings} films={base} />
+      <FilterBar
+        films={base}
+        filters={filters}
+        onChange={setFilters}
+        visibleCount={visible.length}
+        matches={matches}
+        leading={<SourceSelect value={source} onChange={(value) => setFilters({ source: value })} />}
+      />
       <Board
         tiers={tiers}
         films={visible}
         matches={matches}
-        onTiersChange={setTiers}
+        onTiersChange={history.set}
+        history={history}
         poolSort={poolSort}
         onPoolSortChange={setPoolSort}
         onAutoFill={() => setAutoFillOpen(true)}
@@ -47,7 +68,7 @@ export function TierListPage({ onOpenSettings }: { onOpenSettings: () => void })
         films={visible}
         ratingMap={ratingMap}
         onRatingMapChange={setRatingMap}
-        onApply={setTiers}
+        onApply={history.set}
       />
     </>
   )

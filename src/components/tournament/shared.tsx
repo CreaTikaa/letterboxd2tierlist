@@ -16,10 +16,11 @@ import {
   type SelectionMode,
   type Tournament,
 } from '../../lib/tournament'
-import type { Film } from '../../lib/types'
+import type { Film, Match } from '../../lib/types'
 import { useStore } from '../../store/useStore'
 import { PosterCard } from '../board/PosterCard'
 import { Button, inputClass } from '../ui'
+import { BracketView } from './BracketView'
 import { useSeedLookup } from './useSeedLookup'
 
 export function BracketSizeSelect({ value, options, onChange }: { value: number; options: number[]; onChange: (size: number) => void }) {
@@ -123,7 +124,8 @@ export type CardState = 'idle' | 'selected' | 'won' | 'lost'
 
 interface MatchupCardProps {
   film: Film
-  seed: number
+  /** Shown as a badge in tournaments. */
+  seed?: number
   state: CardState
   onPick: () => void
   /** Small label in the top-right corner (e.g. the keyboard shortcut). */
@@ -161,7 +163,7 @@ export function MatchupCard({ film, seed, state, onPick, hint, subtitle, footer,
             {film.year && <span className="text-muted">{film.year}</span>}
           </div>
         )}
-        <span className="absolute top-2 left-2 rounded bg-black/80 px-2 py-0.5 text-xs font-bold">{t('tournament.seed', { seed })}</span>
+        {seed != null && <span className="absolute top-2 left-2 rounded bg-black/80 px-2 py-0.5 text-xs font-bold">{t('tournament.seed', { seed })}</span>}
         {hint && <span className="absolute top-2 right-2 hidden rounded bg-black/80 px-2 py-0.5 text-xs text-muted sm:block">{hint}</span>}
       </div>
       <div className="space-y-0.5 p-3">
@@ -194,8 +196,23 @@ export function MatchHeader({ tournament: bracket, round, match }: { tournament:
 }
 
 /** Champion, upsets and final standings. `actions` go under the champion; `children` at the end. */
-export function TournamentResults({ tournament: bracket, actions, children }: { tournament: Tournament; actions: ReactNode; children?: ReactNode }) {
-  const matches = useStore((s) => s.matches)
+export function TournamentResults({
+  tournament: bracket,
+  actions,
+  children,
+  matches: matchesOverride,
+  readOnly = false,
+}: {
+  tournament: Tournament
+  actions: ReactNode
+  children?: ReactNode
+  /** Posters for a shared bracket (instead of your own cache). */
+  matches?: Record<string, Match>
+  /** Shared view: posters aren't clickable. */
+  readOnly?: boolean
+}) {
+  const ownMatches = useStore((s) => s.matches)
+  const matches = matchesOverride ?? ownMatches
   const setEditingFilm = useStore((s) => s.setEditingFilm)
   const t = useT()
   const locale = useLocale()
@@ -259,7 +276,14 @@ export function TournamentResults({ tournament: bracket, actions, children }: { 
               {entries.map(({ filmId, seed }) => {
                 const film = seedOf.get(filmId)!.film
                 return (
-                  <button key={filmId} type="button" onClick={() => setEditingFilm(film)} className="relative" title={t('tournament.seed', { seed })}>
+                  <button
+                    key={filmId}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => setEditingFilm(film)}
+                    className="relative disabled:cursor-default"
+                    title={`${film.name} · ${t('tournament.seed', { seed })}`}
+                  >
                     <PosterCard film={film} match={matches[filmId]} width={place <= 2 ? 88 : 64} showRating={false} />
                     <span className="absolute top-0.5 left-0.5 rounded bg-black/80 px-1 text-[10px] font-bold">#{seed}</span>
                   </button>
@@ -269,6 +293,13 @@ export function TournamentResults({ tournament: bracket, actions, children }: { 
           </div>
         ))}
       </div>
+
+      <details className="rounded-xl bg-panel/50 p-4">
+        <summary className="cursor-pointer font-semibold">{t('bracket.title')}</summary>
+        <div className="mt-3">
+          <BracketView bracket={bracket} matches={matches} />
+        </div>
+      </details>
     </div>
   )
 }

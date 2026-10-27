@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_FILTERS, countByGenre, filterFilms, sortFilms } from './filter'
+import { DEFAULT_FILTERS, countByGenre, filterFilms, peopleIndex, sortFilms } from './filter'
 import type { Film, Match } from './types'
 
 const film = (name: string, rating: number | null, year: number | null = 2000, watchedDate: string | null = null): Film => ({
@@ -63,5 +63,25 @@ describe('sortFilms', () => {
   it('sorts by most recently watched', () => {
     const sorted = sortFilms([film('Old', 3, 2000, '2020-01-01'), film('New', 3, 2000, '2024-01-01'), film('Never', 3)], 'watched')
     expect(sorted.map((f) => f.name)).toEqual(['New', 'Old', 'Never'])
+  })
+})
+
+describe('people filter', () => {
+  const matched = (tmdbId: number): Match => ({ status: 'matched', tmdbId, title: '', year: null, posterPath: null, genreIds: [] })
+  const matches: Record<string, Match> = { Alien: matched(1), Brazil: matched(2), Cats: matched(3) }
+  const credits = {
+    1: { directors: [[10, 'Ridley Scott']] as [number, string][], cast: [[20, 'Sigourney Weaver']] as [number, string][] },
+    2: { directors: [[11, 'Terry Gilliam']] as [number, string][], cast: [[20, 'Sigourney Weaver']] as [number, string][] },
+  }
+
+  it('keeps films a person directed or appears in', () => {
+    expect(filterFilms(FILMS, { ...DEFAULT_FILTERS, person: 20 }, matches, credits).map((f) => f.name)).toEqual(['Alien', 'Brazil'])
+    expect(filterFilms(FILMS, { ...DEFAULT_FILTERS, person: 10 }, matches, credits).map((f) => f.name)).toEqual(['Alien'])
+  })
+
+  it('indexes everyone with their counts', () => {
+    const people = peopleIndex(FILMS, matches, credits)
+    expect(people.find((p) => p.id === 20)).toEqual({ id: 20, name: 'Sigourney Weaver', directed: 0, acted: 2 })
+    expect(people.find((p) => p.id === 11)).toMatchObject({ directed: 1, acted: 0 })
   })
 })

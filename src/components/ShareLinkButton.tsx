@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { errorMessage, useT } from '../i18n'
-import { LONG_LINK, encodeSharedList, shareUrl, type SharedList } from '../lib/share'
+import { LONG_LINK, encodeShared, shareUrl, type SharedItem, type SharedList } from '../lib/share'
 import { useStore } from '../store/useStore'
 import { Button } from './ui'
 
-/** Copies a read-only link to the list that `build` returns. */
-export function ShareLinkButton({ build, label }: { build: () => SharedList; label?: string }) {
+/** Copies a read-only link to what `build` returns (a tier list by default, or any shared item). */
+export function ShareLinkButton({ build, label, variant = 'ghost' }: { build: () => SharedList | SharedItem; label?: string; variant?: 'ghost' | 'secondary' }) {
   const notify = useStore((s) => s.notify)
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -13,12 +13,13 @@ export function ShareLinkButton({ build, label }: { build: () => SharedList; lab
   const share = async () => {
     setBusy(true)
     try {
-      const list = build()
-      if (list.tiers.every((tier) => tier.films.length === 0)) {
+      const built = build()
+      const item: SharedItem = 'kind' in built ? built : { kind: 'tierlist', list: built }
+      if (item.kind === 'tierlist' && item.list.tiers.every((tier) => tier.films.length === 0)) {
         notify({ kind: 'error', text: t('share.empty') })
         return
       }
-      const url = shareUrl(await encodeSharedList(list))
+      const url = shareUrl(await encodeShared(item))
       try {
         await navigator.clipboard.writeText(url)
       } catch {
@@ -36,7 +37,7 @@ export function ShareLinkButton({ build, label }: { build: () => SharedList; lab
   }
 
   return (
-    <Button variant="ghost" disabled={busy} onClick={() => void share()}>
+    <Button variant={variant} disabled={busy} onClick={() => void share()}>
       🔗 {label ?? t('share.copy')}
     </Button>
   )

@@ -16,11 +16,13 @@ interface Props {
   onUpdate: (changes: Partial<Omit<Tier, 'id'>>) => void
   onMove: (offset: -1 | 1) => void
   onRemove: () => void
+  /** Clicking the row's empty space (used to drop the selected film here). */
+  onAreaClick?: () => void
 }
 
 const iconButton = 'rounded px-1.5 py-0.5 text-muted hover:bg-raised hover:text-text disabled:opacity-30 disabled:hover:bg-transparent'
 
-export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst, isLast, onUpdate, onMove, onRemove }: Props) {
+export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst, isLast, onUpdate, onMove, onRemove, onAreaClick }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: tier.id })
   const t = useT()
   const minHeight = Math.round(cardOptions.width * 1.5)
@@ -39,7 +41,12 @@ export function TierRow({ tier, filmIds, filmById, matches, cardOptions, isFirst
       </div>
 
       <SortableContext id={tier.id} items={filmIds} strategy={rectSortingStrategy}>
-        <div ref={setNodeRef} className={`flex flex-1 flex-wrap content-start gap-0.5 p-0.5 ${isOver ? 'bg-white/5' : ''}`} style={{ minHeight }}>
+        <div
+          ref={setNodeRef}
+          onClick={(e) => e.target === e.currentTarget && onAreaClick?.()}
+          className={`flex flex-1 flex-wrap content-start gap-0.5 p-0.5 ${isOver ? 'bg-white/5' : ''} ${onAreaClick ? 'cursor-pointer hover:bg-white/5' : ''}`}
+          style={{ minHeight }}
+        >
           {filmIds.map((id) => {
             const film = filmById.get(id)
             return film ? <SortablePoster key={id} film={film} match={matches[id]} options={cardOptions} /> : null

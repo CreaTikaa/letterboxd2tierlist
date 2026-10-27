@@ -13,10 +13,14 @@ export async function importFromFiles(files: File[]): Promise<boolean> {
       loadSave(save)
       notify({ kind: 'success', text: t('import.loadedSave', { count: save.films.length }) })
     } else {
-      const films = await readLetterboxdFiles(files)
-      importFilms(films)
+      const { films, lists } = await readLetterboxdFiles(files)
+      importFilms(films, lists)
       const rated = films.filter((f) => f.rating != null).length
-      notify({ kind: 'success', text: t('import.imported', { count: films.length, rated }) })
+      const liked = films.filter((f) => f.liked).length
+      notify({
+        kind: 'success',
+        text: lists.length || liked ? t('import.importedExtras', { count: films.length, rated, liked, lists: t('import.lists', { count: lists.length }) }) : t('import.imported', { count: films.length, rated }),
+      })
     }
     return true
   } catch (error) {

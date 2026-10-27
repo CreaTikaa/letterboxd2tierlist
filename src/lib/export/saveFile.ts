@@ -1,5 +1,5 @@
 import { AppError } from '../errors'
-import type { Film, Filters, Match, RatingMap, Tier } from '../types'
+import type { Film, Filters, LetterboxdList, Match, RatingMap, Tier } from '../types'
 
 export interface SaveFile {
   app: 'letterboxd2tierlist'
@@ -10,6 +10,8 @@ export interface SaveFile {
   tiers: Tier[]
   ratingMap: RatingMap
   filters: Filters
+  /** Added later; older save files don't have it. */
+  lists?: LetterboxdList[]
 }
 
 export function createSaveFile(data: Omit<SaveFile, 'app' | 'version' | 'savedAt'>): SaveFile {

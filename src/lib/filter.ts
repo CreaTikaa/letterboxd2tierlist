@@ -1,5 +1,6 @@
+import { titleKey } from './letterboxd/parse'
 import { RATING_VALUES } from './ratings'
-import type { Film, Filters, Match, PoolSort } from './types'
+import type { Credits, Film, Filters, LetterboxdList, Match, PoolSort } from './types'
 
 export const DEFAULT_FILTERS: Filters = {
   ratings: [...RATING_VALUES],
@@ -8,14 +9,71 @@ export const DEFAULT_FILTERS: Filters = {
   yearMin: null,
   yearMax: null,
   genres: [],
+  source: 'all',
+  person: null,
+}
+
+/**
+ * The films a view starts from: everything watched, liked films, or one list (in list order, using
+ * your watched copy, with its rating, when there is one).
+ */
+export function sourceFilms(films: Film[], lists: LetterboxdList[], source = 'all'): Film[] {
+  if (source === 'liked') return films.filter((f) => f.liked)
+  const list = source.startsWith('list:') ? lists.find((l) => l.id === source.slice(5)) : undefined
+  if (!list) return films
+  const byId = new Map(films.map((f) => [f.id, f]))
+  const byTitle = new Map(films.map((f) => [titleKey(f), f]))
+  const seen = new Set<string>()
+  return list.films.flatMap((entry) => {
+    const film = byId.get(entry.id) ?? byTitle.get(titleKey(entry)) ?? entry
+    if (seen.has(film.id)) return []
+    seen.add(film.id)
+    return [film]
+  })
 }
 
 export function genresOf(match: Match | undefined): number[] | undefined {
   return match?.status === 'matched' ? match.genreIds : undefined
 }
 
-/** `matches` is only needed for the genre filter. */
-export function filterFilms(films: Film[], filters: Filters, matches: Record<string, Match> = {}): Film[] {
+/** Does the film's cast & crew include this person? (false when credits aren't loaded) */
+export function hasPerson(match: Match | undefined, credits: Record<number, Credits>, person: number): boolean {
+  const entry = match?.status === 'matched' ? credits[match.tmdbId] : undefined
+  return Boolean(entry && (entry.directors.some(([id]) => id === person) || entry.cast.some(([id]) => id === person)))
+}
+
+export interface PersonCount {
+  id: number
+  name: string
+  directed: number
+  acted: number
+}
+
+/** Everyone credited on the given films, with how many they directed / appeared in. */
+export function peopleIndex(films: Film[], matches: Record<string, Match>, credits: Record<number, Credits>): PersonCount[] {
+  const people = new Map<number, PersonCount>()
+  const seenFilms = new Set<number>()
+  for (const film of films) {
+    const match = matches[film.id]
+    const entry = match?.status === 'matched' ? credits[match.tmdbId] : undefined
+    if (!entry || match?.status !== 'matched' || seenFilms.has(match.tmdbId)) continue
+    seenFilms.add(match.tmdbId)
+    for (const [id, name] of entry.directors) {
+      const person = people.get(id) ?? { id, name, directed: 0, acted: 0 }
+      person.directed++
+      people.set(id, person)
+    }
+    for (const [id, name] of entry.cast) {
+      const person = people.get(id) ?? { id, name, directed: 0, acted: 0 }
+      person.acted++
+      people.set(id, person)
+    }
+  }
+  return [...people.values()]
+}
+
+/** `matches` is needed for the genre filter, `credits` for the person filter. */
+export function filterFilms(films: Film[], filters: Filters, matches: Record<string, Match> = {}, credits: Record<number, Credits> = {}): Film[] {
   const allowed = new Set(filters.ratings)
   const query = filters.search.trim().toLowerCase()
   // Saved filters from before genres existed have no `genres`.
@@ -26,6 +84,7 @@ export function filterFilms(films: Film[], filters: Filters, matches: Record<str
     if (filters.yearMin != null && (film.year == null || film.year < filters.yearMin)) return false
     if (filters.yearMax != null && (film.year == null || film.year > filters.yearMax)) return false
     if (genres.size && !genresOf(matches[film.id])?.some((g) => genres.has(g))) return false
+    if (filters.person != null && !hasPerson(matches[film.id], credits, filters.person)) return false
     return true
   })
 }

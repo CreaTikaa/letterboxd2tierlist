@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ImportPanel } from '../components/ImportPanel'
+import { ShareLinkButton } from '../components/ShareLinkButton'
+import { SourceSelect } from '../components/SourceSelect'
 import {
   BracketSizeSelect,
   GenreSelect,
@@ -11,13 +13,16 @@ import {
 } from '../components/tournament/shared'
 import { useSeedLookup } from '../components/tournament/useSeedLookup'
 import { Button, inputClass } from '../components/ui'
+import { useVisibleFilms } from '../hooks'
+import { useUndoKey } from '../hooks/useHistory'
 import { errorMessage, useT } from '../i18n'
 import { Trans } from '../i18n/Trans'
 import { useTournamentText } from '../i18n/tournamentText'
 import { dateStamp, downloadBlob } from '../lib/download'
 import { renderTournamentPng } from '../lib/export/tournamentPng'
-import { genresOf } from '../lib/filter'
+import { genresOf, sourceFilms } from '../lib/filter'
 import { RATING_VALUES, stars } from '../lib/ratings'
+import { sharedTournamentFrom } from '../lib/share'
 import {
   MIN_ENTRANTS,
   bracketSizeOptions,
@@ -49,7 +54,11 @@ export function TournamentPage() {
 function Setup({ films }: { films: Film[] }) {
   const setTournament = useStore((s) => s.setTournament)
   const matches = useStore((s) => s.matches)
+  const lists = useStore((s) => s.lists)
+  const [source, setSource] = useState('all')
   const [genre, setGenre] = useState(0)
+  const visible = useVisibleFilms()
+  const base = useMemo(() => (source === 'visible' ? visible : sourceFilms(films, lists, source)), [films, lists, source, visible])
   const [minRating, setMinRating] = useState(0)
   const [includeUnrated, setIncludeUnrated] = useState(false)
   const [mode, setMode] = useState<SelectionMode>('top')
@@ -57,7 +66,7 @@ function Setup({ films }: { films: Film[] }) {
   const [shuffleKey, setShuffleKey] = useState(0)
   const t = useT()
 
-  const rated = useMemo(() => films.filter((f) => (f.rating == null ? includeUnrated : f.rating >= minRating)), [films, minRating, includeUnrated])
+  const rated = useMemo(() => base.filter((f) => (f.rating == null ? includeUnrated : f.rating >= minRating)), [base, minRating, includeUnrated])
   const eligible = useMemo(() => (genre ? rated.filter((f) => genresOf(matches[f.id])?.includes(genre)) : rated), [rated, genre, matches])
   const options = useMemo(() => bracketSizeOptions(eligible.length), [eligible.length])
   const count = pickBracketSize(options, requested)
@@ -86,6 +95,7 @@ function Setup({ films }: { films: Film[] }) {
       </div>
 
       <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        <SourceSelect value={source} onChange={setSource} visibleCount={visible.length} className="flex-col !items-stretch" />
         <label className="flex flex-col gap-1 text-muted">
           {t('tournament.minRating')}
           <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className={inputClass}>
@@ -178,6 +188,7 @@ function Results({ tournament: bracket }: { tournament: Tournament }) {
   const [exporting, setExporting] = useState(false)
   const t = useT()
   const { imageTexts } = useTournamentText()
+  useUndoKey(() => setTournament(undo(bracket)))
 
   const exportPng = async () => {
     setExporting(true)
@@ -208,6 +219,11 @@ function Results({ tournament: bracket }: { tournament: Tournament }) {
           >
             {t('tournament.sendToTierList')}
           </Button>
+          <ShareLinkButton
+            variant="secondary"
+            label={t('share.short')}
+            build={() => ({ kind: 'tournament', tournament: sharedTournamentFrom(t('tournament.shareTitle'), bracket, matches) })}
+          />
           <Button onClick={() => setTournament(createTournament(bracket.seeds))}>{t('tournament.replay')}</Button>
           <Button variant="ghost" onClick={() => setTournament(undo(bracket))}>
             {t('tournament.undoFinal')}

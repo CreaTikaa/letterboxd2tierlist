@@ -7,8 +7,11 @@ export type Route =
   /** `password` comes from an invite link that includes it (`#/room/CODE?pw=…`). */
   | { page: 'room'; roomId: string; password?: string }
   | { page: 'tournament' }
-  /** Read-only tier list encoded in the link itself. */
+  /** Read-only tier list, tournament or ranking encoded in the link itself. */
   | { page: 'view'; code: string }
+  | { page: 'rank' }
+  /** Two shared tier lists side by side; `b` may be "mine" (your own tier list). */
+  | { page: 'compare'; a: string; b: string }
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, '').split('/').filter(Boolean)
@@ -20,6 +23,8 @@ export function parseRoute(hash: string): Route {
   }
   if (path[0] === 'tournament') return { page: 'tournament' }
   if (path[0] === 'view' && path[1]) return { page: 'view', code: path[1] }
+  if (path[0] === 'rank') return { page: 'rank' }
+  if (path[0] === 'compare' && path[1] && path[2]) return { page: 'compare', a: path[1], b: path[2] }
   return { page: 'tierlist' }
 }
 
@@ -33,6 +38,10 @@ export function routeHref(route: Route): string {
       return '#/tournament'
     case 'view':
       return `#/view/${route.code}`
+    case 'rank':
+      return '#/rank'
+    case 'compare':
+      return `#/compare/${route.a}/${route.b}`
     default:
       return '#/'
   }

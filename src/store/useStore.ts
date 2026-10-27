@@ -6,8 +6,9 @@ import type { SaveFile } from '../lib/export/saveFile'
 import { DEFAULT_FILTERS } from '../lib/filter'
 import { randomId } from '../lib/random'
 import { defaultRatingMap, defaultTiers } from '../lib/tiers'
+import type { RankSession } from '../lib/rank'
 import type { Tournament } from '../lib/tournament'
-import type { Film, Filters, Match, PoolSort, RatingMap, Tier } from '../lib/types'
+import type { Credits, Film, Filters, LetterboxdList, Match, PoolSort, RatingMap, Tier } from '../lib/types'
 
 export type EnrichmentError = { code: 'invalidKey' } | { code: 'failed'; count: number }
 
@@ -25,7 +26,13 @@ export interface Notice {
 
 interface State {
   films: Film[]
+  /** The user's Letterboxd lists, from the export. */
+  lists: LetterboxdList[]
   matches: Record<string, Match>
+  /** Cast & crew by TMDB id, fetched on demand for the people filter. */
+  credits: Record<number, Credits>
+  /** Progress of the cast & crew lookup (not persisted). */
+  creditsProgress: { done: number; total: number } | null
   tmdbKey: string
   filters: Filters
   tiers: Tier[]
@@ -40,6 +47,8 @@ interface State {
   /** Identity used in rooms; memberId is stable per browser. */
   profile: { memberId: string; name: string }
   tournament: Tournament | null
+  /** "Rank everything" in progress or finished. */
+  ranking: RankSession | null
   /** Room codes visited, most recent first. */
   recentRooms: string[]
   /** Room passwords you've used, so rejoining doesn't ask again. */
@@ -47,13 +56,15 @@ interface State {
   language: Language
 }
 
-type PersistedState = Omit<State, 'enrichment' | 'editingFilm' | 'notice'>
+type PersistedState = Omit<State, 'enrichment' | 'editingFilm' | 'notice' | 'creditsProgress'>
 
 interface Actions {
-  importFilms: (films: Film[]) => void
+  importFilms: (films: Film[], lists?: LetterboxdList[]) => void
   setTmdbKey: (key: string) => void
   setFilters: (filters: Partial<Filters>) => void
   setMatches: (matches: Record<string, Match>) => void
+  setCredits: (credits: Record<number, Credits>) => void
+  setCreditsProgress: (progress: { done: number; total: number } | null) => void
   setEnrichment: (enrichment: Partial<Enrichment>) => void
   setTiers: (tiers: Tier[]) => void
   setRatingMap: (map: RatingMap) => void
@@ -67,6 +78,7 @@ interface Actions {
   notify: (notice: Notice | null) => void
   setProfileName: (name: string) => void
   setTournament: (tournament: Tournament | null) => void
+  setRanking: (ranking: RankSession | null) => void
   rememberRoom: (roomId: string) => void
   setRoomPassword: (roomId: string, password: string) => void
   setLanguage: (language: Language) => void
@@ -118,7 +130,10 @@ const initialTiers = defaultTiers()
 
 const initialState: State = {
   films: [],
+  lists: [],
   matches: {},
+  credits: {},
+  creditsProgress: null,
   tmdbKey: '',
   filters: DEFAULT_FILTERS,
   tiers: initialTiers,
@@ -131,6 +146,7 @@ const initialState: State = {
   notice: null,
   profile: { memberId: randomId(12), name: '' },
   tournament: null,
+  ranking: null,
   recentRooms: [],
   roomPasswords: {},
   language: detectLanguage(),
@@ -141,11 +157,15 @@ export const useStore = create<State & Actions>()(
     (setState) => ({
       ...initialState,
 
-      importFilms: (films) =>
+      importFilms: (films, lists = []) =>
         setState((s) => {
-          const ids = new Set(films.map((f) => f.id))
+          const ids = new Set([...films, ...lists.flatMap((l) => l.films)].map((f) => f.id))
+          const source = s.filters.source ?? 'all'
           return {
             films,
+            lists,
+            // A list that's gone from the new export can't stay selected.
+            filters: source.startsWith('list:') && !lists.some((l) => `list:${l.id}` === source) ? { ...s.filters, source: 'all' } : s.filters,
             // Keep placements for films that are still in the export.
             tiers: s.tiers.map((t) => ({ ...t, filmIds: t.filmIds.filter((id) => ids.has(id)) })),
           }
@@ -153,6 +173,8 @@ export const useStore = create<State & Actions>()(
       setTmdbKey: (tmdbKey) => setState({ tmdbKey: tmdbKey.trim() }),
       setFilters: (filters) => setState((s) => ({ filters: { ...s.filters, ...filters } })),
       setMatches: (matches) => setState((s) => ({ matches: { ...s.matches, ...matches } })),
+      setCredits: (credits) => setState((s) => ({ credits: { ...s.credits, ...credits } })),
+      setCreditsProgress: (creditsProgress) => setState({ creditsProgress }),
       setEnrichment: (enrichment) => setState((s) => ({ enrichment: { ...s.enrichment, ...enrichment } })),
       setTiers: (tiers) => setState({ tiers }),
       setRatingMap: (ratingMap) => setState({ ratingMap }),
@@ -163,6 +185,7 @@ export const useStore = create<State & Actions>()(
       loadSave: (save) =>
         setState((s) => ({
           films: save.films,
+          lists: save.lists ?? [],
           matches: { ...s.matches, ...save.matches },
           tiers: save.tiers,
           ratingMap: save.ratingMap ?? defaultRatingMap(save.tiers),
@@ -173,6 +196,7 @@ export const useStore = create<State & Actions>()(
       notify: (notice) => setState({ notice }),
       setProfileName: (name) => setState((s) => ({ profile: { ...s.profile, name: name.slice(0, 24) } })),
       setTournament: (tournament) => setState({ tournament }),
+      setRanking: (ranking) => setState({ ranking }),
       setLanguage: (language) => setState({ language }),
       setRoomPassword: (roomId, password) =>
         setState((s) => {
@@ -192,7 +216,7 @@ export const useStore = create<State & Actions>()(
       version: 1,
       storage: idbStorage<PersistedState>(),
       // Data only: transient UI state is left out, and actions can't be stored as objects.
-      partialize: ({ enrichment: _e, editingFilm: _f, notice: _n, ...rest }) =>
+      partialize: ({ enrichment: _e, editingFilm: _f, notice: _n, creditsProgress: _c, ...rest }) =>
         Object.fromEntries(Object.entries(rest).filter(([, value]) => typeof value !== 'function')) as PersistedState,
     },
   ),

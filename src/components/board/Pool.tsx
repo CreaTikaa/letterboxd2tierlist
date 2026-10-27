@@ -24,9 +24,10 @@ interface Props {
   cardOptions: CardOptions
   poolSort: PoolSort
   onPoolSortChange: (sort: PoolSort) => void
+  onAreaClick?: () => void
 }
 
-export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPoolSortChange }: Props) {
+export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPoolSortChange, onAreaClick }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: POOL_ID })
   const [limit, setLimit] = useState(PAGE)
   const t = useT()
@@ -52,7 +53,8 @@ export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPool
       <div
         ref={setNodeRef}
         data-pool
-        className={`flex min-h-32 flex-wrap content-start gap-0.5 rounded-lg border border-dashed p-1 transition ${isOver ? 'border-lb-green bg-lb-green/5' : 'border-line'}`}
+        onClick={(e) => e.target === e.currentTarget && onAreaClick?.()}
+        className={`flex min-h-32 flex-wrap content-start gap-0.5 rounded-lg border border-dashed p-1 transition ${isOver ? 'border-lb-green bg-lb-green/5' : 'border-line'} ${onAreaClick ? 'cursor-pointer' : ''}`}
       >
         {filmIds.length === 0 && <p className="m-auto p-6 text-sm text-muted">{t('pool.empty')}</p>}
         {shown.map((id) => {

@@ -65,3 +65,23 @@ export function moveTier(tiers: Tier[], id: string, offset: -1 | 1): Tier[] {
 }
 
 export const clearTiers = (tiers: Tier[]): Tier[] => tiers.map((t) => ({ ...t, filmIds: [] }))
+
+/** Same tiers (ids, labels, colours, films and order)? Used to tell our own changes from others'. */
+export function tiersEqual(a: Tier[], b: Tier[]): boolean {
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every((tier, i) => {
+        const other = b[i]
+        return tier.id === other.id && tier.label === other.label && tier.color === other.color && tier.filmIds.join('\n') === other.filmIds.join('\n')
+      }))
+  )
+}
+
+/** Moves a film to the end of a tier (or off the board when `tierId` is null). */
+export function moveFilmTo(tiers: Tier[], filmId: string, tierId: string | null): Tier[] {
+  return tiers.map((tier) => {
+    const without = tier.filmIds.filter((id) => id !== filmId)
+    return { ...tier, filmIds: tier.id === tierId ? [...without, filmId] : without }
+  })
+}

@@ -5,7 +5,8 @@ import { dateStamp, downloadBlob } from '../../lib/download'
 import { renderTierListPng } from '../../lib/export/png'
 import { DEFAULT_FILTERS, filterFilms } from '../../lib/filter'
 import { groupFilms, type GroupFilm } from '../../lib/room/group'
-import { defaultRatingMap } from '../../lib/tiers'
+import { useHistory } from '../../hooks/useHistory'
+import { defaultRatingMap, tiersEqual } from '../../lib/tiers'
 import type { Film, Filters, PoolSort } from '../../lib/types'
 import { startEnrichment } from '../../store/enrichment'
 import { useRoom } from '../../store/useRoom'
@@ -46,9 +47,12 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [exporting, setExporting] = useState(false)
 
   const eligible = useMemo(() => films.filter((f) => f.watchers.length >= minWatchers), [films, minWatchers])
-  const visible = useMemo(() => filterFilms(eligible, filters, matches), [eligible, filters, matches])
+  const credits = useStore((s) => s.credits)
+  const visible = useMemo(() => filterFilms(eligible, filters, matches, credits), [eligible, filters, matches, credits])
   const setFilters = useCallback((changes: Partial<Filters>) => setFiltersState((f) => ({ ...f, ...changes })), [])
   const setBoard = useCallback((tiers: typeof board) => dispatch({ t: 'board', tiers }), [dispatch])
+  // Undo only covers your own changes; it resets when someone else edits the board.
+  const history = useHistory(board, setBoard, tiersEqual)
   const openFilm = useCallback((film: Film) => setEditingFilm(film), [setEditingFilm])
 
   // Whoever has a TMDB key fetches posters; matches are shared with the room automatically.
@@ -105,7 +109,8 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
         tiers={board}
         films={visible}
         matches={matches}
-        onTiersChange={setBoard}
+        onTiersChange={history.set}
+        history={history}
         poolSort={poolSort}
         onPoolSortChange={setPoolSort}
         onAutoFill={() => setAutoFillOpen(true)}
@@ -128,7 +133,7 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
         films={visible}
         ratingMap={ratingMap}
         onRatingMapChange={setRatingMap}
-        onApply={setBoard}
+        onApply={history.set}
         description={t('autofill.helpGroup')}
       />
     </div>

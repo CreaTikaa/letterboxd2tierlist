@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { boardFromSharedList, decodeSharedList, encodeSharedList, sharedListFromBoard, type SharedList } from './share'
+import {
+  boardFromSharedList,
+  decodeShared,
+  decodeSharedList,
+  encodeShared,
+  encodeSharedList,
+  rankingFromShared,
+  sharedListFromBoard,
+  sharedRankingFrom,
+  sharedTournamentFrom,
+  tournamentFromShared,
+  type SharedList,
+} from './share'
+import { champion, createTournament, currentMatch, entrants, pick, standings } from './tournament'
 import { defaultTiers } from './tiers'
 import type { Film, Match } from './types'
 
@@ -57,5 +70,36 @@ describe('share links', () => {
     expect(board.films.map((f) => f.name)).toEqual(['Alpha', 'Beta'])
     expect(board.matches['shared-0-0']).toMatchObject({ posterPath: '/a.jpg' })
     expect(board.matches['shared-1-0']).toEqual({ status: 'notfound' })
+  })
+})
+
+describe('tournament and ranking links', () => {
+  const films = Array.from({ length: 5 }, (_, i) => film(`f${i}`, `Film ${i}`))
+  const matches: Record<string, Match> = { f0: { status: 'matched', tmdbId: 1, title: 'Film 0', year: 2000, posterPath: '/p0.jpg' } }
+
+  it('round-trips a finished bracket, byes included', async () => {
+    let bracket = createTournament(films)
+    for (let current = currentMatch(bracket); current; current = currentMatch(bracket)) {
+      bracket = pick(bracket, entrants(bracket, current.round, current.match)[1]!)
+    }
+    const code = await encodeShared({ kind: 'tournament', tournament: sharedTournamentFrom('Cup', bracket, matches) })
+    const item = await decodeShared(code)
+    if (item.kind !== 'tournament') throw new Error(item.kind)
+    const rebuilt = tournamentFromShared(item.tournament)
+    expect(item.tournament.title).toBe('Cup')
+    expect(rebuilt.bracket.seeds.map((f) => f.name)).toEqual(films.map((f) => f.name))
+    const name = (id: string | null) => rebuilt.bracket.seeds.find((f) => f.id === id)?.name
+    expect(name(champion(rebuilt.bracket))).toBe(films.find((f) => f.id === champion(bracket))!.name)
+    expect(standings(rebuilt.bracket).map((s) => s.place)).toEqual(standings(bracket).map((s) => s.place))
+    expect(rebuilt.bracket.history).toHaveLength(bracket.history.length)
+    expect(rebuilt.matches['shared-seed-0']).toMatchObject({ posterPath: '/p0.jpg' })
+  })
+
+  it('round-trips a ranking', async () => {
+    const code = await encodeShared({ kind: 'ranking', ranking: sharedRankingFrom('Top', [films[2], films[0]], matches) })
+    const item = await decodeShared(code)
+    if (item.kind !== 'ranking') throw new Error(item.kind)
+    expect(rankingFromShared(item.ranking).films.map((f) => f.name)).toEqual(['Film 2', 'Film 0'])
+    await expect(decodeSharedList(code)).rejects.toThrow()
   })
 })

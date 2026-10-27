@@ -14,9 +14,10 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { isTyping, type History } from '../../hooks/useHistory'
 import { sortFilms } from '../../lib/filter'
-import { addTier, clearTiers, moveTier, placedIds, removeTier, updateTier } from '../../lib/tiers'
+import { addTier, clearTiers, moveFilmTo, moveTier, placedIds, removeTier, updateTier } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
 import { useT } from '../../i18n'
 import { useStore } from '../../store/useStore'
@@ -49,7 +50,10 @@ export interface BoardProps {
   /** Films that pass the current filters; only these are shown. */
   films: Film[]
   matches: Record<string, Match>
-  onTiersChange: (tiers: Tier[]) => void
+  /** `coalesce` groups rapid edits (typing a tier name) into one undo step. */
+  onTiersChange: (tiers: Tier[], coalesce?: string) => void
+  /** Undo/redo for this board (buttons; the keyboard shortcuts come from the hook). */
+  history?: Pick<History<Tier[]>, 'undo' | 'redo' | 'canUndo' | 'canRedo'>
   poolSort: PoolSort
   onPoolSortChange: (sort: PoolSort) => void
   onAutoFill?: () => void
@@ -60,11 +64,19 @@ export interface BoardProps {
   hint?: string
 }
 
-export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSortChange, onAutoFill, onFilmClick, badge, toolbar, hint }: BoardProps) {
+export function Board({ tiers, films, matches, onTiersChange, history, poolSort, onPoolSortChange, onAutoFill, onFilmClick, badge, toolbar, hint }: BoardProps) {
   const cardWidth = useStore((s) => s.cardWidth)
   const showRatings = useStore((s) => s.showRatings)
   const t = useT()
-  const cardOptions = useMemo<CardOptions>(() => ({ width: cardWidth, showRating: showRatings, badge, onClick: onFilmClick }), [cardWidth, showRatings, badge, onFilmClick])
+  // Tap/click a poster to select it, then a tier (or a number key) to send it there.
+  const [rawSelectedId, setSelectedId] = useState<string | null>(null)
+  const toggleSelect = useCallback((film: Film) => setSelectedId((id) => (id === film.id ? null : film.id)), [])
+  // A selected film that gets filtered out or removed simply stops being selected.
+  const selectedId = rawSelectedId && films.some((f) => f.id === rawSelectedId) ? rawSelectedId : null
+  const cardOptions = useMemo<CardOptions>(
+    () => ({ width: cardWidth, showRating: showRatings, badge, onClick: toggleSelect, selectedId }),
+    [cardWidth, showRatings, badge, toggleSelect, selectedId],
+  )
 
   const filmById = useMemo(() => new Map(films.map((f) => [f.id, f])), [films])
   const visibleIds = useMemo(() => new Set(films.map((f) => f.id)), [films])
@@ -158,6 +170,36 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
 
   const activeFilm = activeId ? filmById.get(activeId) : undefined
   const placedCount = tiers.reduce((sum, tier) => sum + (items[tier.id]?.length ?? 0), 0)
+  const selected = selectedId ? filmById.get(selectedId) : undefined
+
+  /** Sends the selected film to a tier (null = back to the pool). From the pool, the next unplaced film gets selected. */
+  const place = useCallback(
+    (tierId: string | null) => {
+      if (!selectedId) return
+      const pool = derived[POOL_ID]
+      const fromPool = pool.indexOf(selectedId)
+      onTiersChange(moveFilmTo(tiers, selectedId, tierId))
+      const next = fromPool >= 0 && tierId ? pool.filter((id) => id !== selectedId)[fromPool] : undefined
+      setSelectedId(next ?? null)
+    },
+    [selectedId, derived, tiers, onTiersChange],
+  )
+
+  // Keyboard: 1–9 = tier, 0 = pool, Enter = details, Esc = deselect.
+  useEffect(() => {
+    if (!selectedId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key === 'Escape') setSelectedId(null)
+      else if (e.key === '0') place(null)
+      else if (/^[1-9]$/.test(e.key) && tiers[Number(e.key) - 1]) place(tiers[Number(e.key) - 1].id)
+      else if (e.key === 'Enter' && selected) onFilmClick?.(selected)
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedId, selected, tiers, place, onFilmClick])
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
@@ -172,6 +214,16 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
           <Button variant="ghost" disabled={placedCount === 0} onClick={() => confirm(t('board.clearConfirm')) && onTiersChange(clearTiers(tiers))}>
             {t('board.clear')}
           </Button>
+          {history && (
+            <span className="flex">
+              <Button variant="ghost" disabled={!history.canUndo} onClick={history.undo} title={t('board.undo')} aria-label={t('board.undo')}>
+                ↶
+              </Button>
+              <Button variant="ghost" disabled={!history.canRedo} onClick={history.redo} title={t('board.redo')} aria-label={t('board.redo')}>
+                ↷
+              </Button>
+            </span>
+          )}
           {toolbar}
           <span className="ml-auto text-xs text-muted">{hint ?? t('board.hint')}</span>
         </div>
@@ -187,7 +239,8 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
               cardOptions={cardOptions}
               isFirst={i === 0}
               isLast={i === tiers.length - 1}
-              onUpdate={(changes) => onTiersChange(updateTier(tiers, tier.id, changes))}
+              onUpdate={(changes) => onTiersChange(updateTier(tiers, tier.id, changes), `edit:${tier.id}:${Object.keys(changes).join()}`)}
+              onAreaClick={selectedId ? () => place(tier.id) : undefined}
               onMove={(offset) => onTiersChange(moveTier(tiers, tier.id, offset))}
               onRemove={() => onTiersChange(removeTier(tiers, tier.id))}
             />
@@ -195,8 +248,49 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
           {tiers.length === 0 && <p className="p-6 text-center text-sm text-muted">{t('board.noTiers')}</p>}
         </div>
 
-        <Pool filmIds={items[POOL_ID]} filmById={filmById} matches={matches} cardOptions={cardOptions} poolSort={poolSort} onPoolSortChange={onPoolSortChange} />
+        <Pool
+          filmIds={items[POOL_ID]}
+          filmById={filmById}
+          matches={matches}
+          cardOptions={cardOptions}
+          poolSort={poolSort}
+          onPoolSortChange={onPoolSortChange}
+          onAreaClick={selectedId ? () => place(null) : undefined}
+        />
       </div>
+
+      {selected && (
+        <div className="fixed inset-x-2 bottom-3 z-30 flex justify-center" role="toolbar" aria-label={t('board.moveTo', { film: selected.name })}>
+          <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-line bg-panel/95 p-2 shadow-2xl backdrop-blur">
+            <span className="max-w-40 truncate px-1 text-sm font-semibold" title={selected.name}>
+              {selected.name}
+            </span>
+            {tiers.map((tier, i) => (
+              <button
+                key={tier.id}
+                type="button"
+                onClick={() => place(tier.id)}
+                title={`${tier.label} (${i + 1})`}
+                className="min-w-9 rounded-md px-2 py-1.5 text-sm font-bold text-ink hover:brightness-110"
+                style={{ background: tier.color }}
+              >
+                {tier.label || i + 1}
+              </button>
+            ))}
+            <Button variant="secondary" className="!px-2" onClick={() => place(null)} title={`${t('board.unplace')} (0)`}>
+              {t('board.unplace')}
+            </Button>
+            {onFilmClick && (
+              <Button variant="ghost" className="!px-2" onClick={() => onFilmClick(selected)} title={`${t('board.details')} (Enter)`}>
+                {t('board.details')}
+              </Button>
+            )}
+            <Button variant="ghost" className="!px-2" onClick={() => setSelectedId(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}>
+              ✕
+            </Button>
+          </div>
+        </div>
+      )}
 
       <DragOverlay dropAnimation={null}>
         {activeFilm && <PosterCard film={activeFilm} match={matches[activeFilm.id]} width={cardWidth} showRating={showRatings} badge={badge} lifted />}
