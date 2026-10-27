@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { addTmdbKey, expect, fixtures, importExport, onlyFiveStars, readClipboard, strangerPage, test, tierCards, waitForSave } from './support'
+import { addTmdbKey, copyLink, expect, fixtures, importExport, onlyFiveStars, strangerPage, test, tierCards, waitForSave } from './support'
 
 test('solo tournament: play, undo, bracket, share, send to tier list', async ({ page, browser }) => {
   await page.goto('/')
@@ -42,9 +42,8 @@ test('solo tournament: play, undo, bracket, share, send to tier list', async ({ 
   expect(fs.statSync((await download.path())!).size).toBeGreaterThan(10_000)
 
   // Share link, opened by someone with no data and no TMDB key.
-  await page.getByRole('button', { name: 'Share link' }).click()
+  const link = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
   await expect(page.getByText(/Link copied/)).toBeVisible()
-  const link = await readClipboard(page)
   expect(link).toMatch(/#\/view\/[A-Za-z0-9_-]+$/)
   const stranger = await strangerPage(browser)
   await stranger.goto(link)
@@ -118,8 +117,7 @@ test('rank everything: break ties, undo, share, send to tier list', async ({ pag
   expect(order).toHaveLength(fives)
   expect(order[0]).toMatch(/^1\. /)
 
-  await page.getByRole('button', { name: 'Share link' }).click()
-  const link = await readClipboard(page)
+  const link = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
   const stranger = await strangerPage(browser)
   await stranger.goto(link)
   await expect(stranger.getByText('My Letterboxd ranking')).toBeVisible()

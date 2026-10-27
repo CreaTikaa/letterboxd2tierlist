@@ -1,4 +1,4 @@
-import { addTmdbKey, drag, expect, fixtures, importExport, newUser, readClipboard, test, type Page, type User } from './support'
+import { addTmdbKey, drag, expect, fixtures, importExport, copyLink, newUser, test, type Page, type User } from './support'
 
 // Rooms connect real browsers peer-to-peer through public relays: allow time to find each other.
 const CONNECT = { timeout: 90_000 }
@@ -137,8 +137,7 @@ test('password, guess whose list, and a group tournament for three', async ({ br
   await expect(bob.getByText('2 people online')).toBeVisible(CONNECT)
 
   // "Copy link + password" lets Carol straight in, and the password leaves the address bar.
-  await alice.getByRole('button', { name: 'Copy link + password' }).click()
-  const link = await readClipboard(alice)
+  const link = await copyLink(alice, alice.getByRole('button', { name: 'Copy link + password' }))
   expect(link).toContain('?pw=hunter2')
   await carol.goto(link)
   await carol.getByPlaceholder('How friends will see you').fill('Carol')
@@ -221,6 +220,5 @@ test('password, guess whose list, and a group tournament for three', async ({ br
   await expect(bob.getByRole('button', { name: 'New tournament' })).toHaveCount(0)
 
   // Anyone can share the result.
-  await bob.getByRole('button', { name: 'Share link' }).click()
-  expect(await readClipboard(bob)).toMatch(/#\/view\//)
+  expect(await copyLink(bob, bob.getByRole('button', { name: 'Share link' }))).toMatch(/#\/view\//)
 })
