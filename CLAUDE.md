@@ -13,11 +13,13 @@ Vite + React 19 + TypeScript, Tailwind v4, Zustand (persisted to IndexedDB), dnd
 - The language e2e test fails if any English text is left on a Chinese screen.
 - PRs target `main`; the owner merges.
 
-## State of the "big batch" (branch feat/big-batch)
-Done: tap-to-place + keyboard, undo/redo (`src/hooks/useHistory.ts`) on all boards + Z/Ctrl+Z in tournament and ranking, likes/lists import + source select, director/actor filter (TMDB credits), Rank everything (`src/lib/rank.ts`, `src/pages/RankPage.tsx`), share links v2 for tournaments/rankings (`src/lib/share.ts`), bracket view, compare page (`src/lib/compare.ts`, `src/pages/ComparePage.tsx`), lazy dictionaries, Playwright suite + CI job.
+## State
+Merged (#6, "big batch"): tap-to-place + keyboard, undo/redo (`src/hooks/useHistory.ts`) on all boards + Z/Ctrl+Z in tournament and ranking, likes/lists import + source select, director/actor filter (TMDB credits), Rank everything (`src/lib/rank.ts`, `src/pages/RankPage.tsx`), share links v2 for tournaments/rankings (`src/lib/share.ts`), bracket view, compare page (`src/lib/compare.ts`, `src/pages/ComparePage.tsx`), lazy dictionaries, Playwright suite + CI job.
+
+Branch feat/find-and-compare: "Find a film" on every board + Ctrl+F (`src/components/board/FindFilm.tsx`, `findFilms`/`foldText` in `src/lib/filter.ts`), compare accepts tournament/ranking links (`rankingAsList`, `tournamentAsList`), bracket image (`src/lib/export/bracketPng.ts`), list names capitalised, unsaved changes rescued to localStorage on `pagehide` (`src/store/useStore.ts`).
+
+Tests: copy buttons are async, so read links with `copyLink(page, button)` from `e2e/support.ts`, never straight from the clipboard.
 
 Ideas not done yet:
-- Lists without a metadata block are named from the file name in lower case ("guilty pleasures"); could capitalise.
-- Saves pending during a reload within 150 ms of a change can be lost (IndexedDB write on `pagehide` isn't guaranteed).
-- Compare page: also accept tournament/ranking links; compare two rooms' showdown lists.
-- Bracket image export (the PNG is still the standings layout).
+- Compare two rooms' showdown lists.
+- Lists imported before the capitalisation fix keep their lower-case name until re-imported.
