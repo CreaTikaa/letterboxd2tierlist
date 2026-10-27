@@ -68,6 +68,7 @@ export const SortablePoster = memo(function SortablePoster({ film, match, option
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
+      data-film-id={film.id}
       data-selected={selectedId === film.id || undefined}
       className={`cursor-grab touch-manipulation rounded-[3px] active:cursor-grabbing ${isDragging ? 'opacity-30' : ''} ${selectedId === film.id ? 'ring-2 ring-lb-blue ring-offset-1 ring-offset-ink' : ''}`}
       onClick={() => onClick?.(film)}
@@ -86,6 +87,7 @@ export const PoolPoster = memo(function PoolPoster({ film, match, options }: Ite
   return (
     <div
       ref={setNodeRef}
+      data-film-id={film.id}
       data-selected={selectedId === film.id || undefined}
       className={`cursor-grab touch-manipulation rounded-[3px] active:cursor-grabbing ${isDragging ? 'opacity-30' : ''} ${selectedId === film.id ? 'ring-2 ring-lb-blue ring-offset-1 ring-offset-ink' : ''}`}
       onClick={() => onClick?.(film)}

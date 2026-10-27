@@ -501,6 +501,9 @@ export const zh: Messages = {
   'board.moveTo': '将《{film}》移到…',
   'board.unplace': '移出',
   'board.details': '详情',
+  'find.placeholder': '查找电影…（Ctrl+F）',
+  'find.label': '在榜单上查找电影',
+  'find.none': '这里没有匹配的电影，可能被筛选条件隐藏了。',
 
   // Lists and likes
   'import.importedExtras': '已导入 {count} 部电影（{rated} 部有评分，{liked} 部点赞）和 {lists}。',
@@ -550,13 +553,14 @@ export const zh: Messages = {
   // Bracket and compare
   'bracket.title': '完整对阵图',
   'bracket.bye': '轮空',
+  'bracket.download': '下载对阵图图片',
   'compare.title': '对比：',
   'compare.withMine': '和我的梯队榜对比',
   'compare.pastePlaceholder': '…或粘贴另一个分享链接',
   'compare.go': '对比',
   'compare.mine': '我的梯队榜',
   'compare.summary': '共同的 {common} 部电影的一致度 · {onlyA} 部只在“{a}”中，{onlyB} 部只在“{b}”中',
-  'compare.nothingInCommon': '这两份梯队榜没有共同的电影。',
+  'compare.nothingInCommon': '这两份榜单没有共同的电影。',
   'compare.disagreements': '分歧最大的电影',
   'tournament.shareTitle': '我的 Letterboxd 淘汰赛',
   'source.visible': '梯队榜当前显示的（{count}）',

@@ -77,6 +77,10 @@ test('import, posters, filters, auto-fill, drag, edit and export', async ({ page
   await expect(page.locator('textarea[aria-label="Tier name"]')).toHaveCount(7)
   await page.locator('textarea[aria-label="Tier name"]').first().fill('GOAT')
   await expect(page.locator('textarea[aria-label="Tier name"]').first()).toHaveValue('GOAT')
+  // Even a reload right after a change (before the batched save) keeps it.
+  await page.reload()
+  await expect(page.locator('textarea[aria-label="Tier name"]')).toHaveCount(7)
+  await expect(page.locator('textarea[aria-label="Tier name"]').first()).toHaveValue('GOAT')
 
   // Fix a poster by TMDB URL (poster → Details).
   await tierCards(page, 0).first().click()
@@ -163,6 +167,26 @@ test('tap to place, keyboard shortcuts and undo/redo', async ({ page }) => {
   await page.keyboard.press('Control+z')
   await expect(label).toHaveValue('S')
 
+  // Ctrl+F finds a film (accents optional), says where it is and selects it.
+  await page.keyboard.press('Control+f')
+  const find = page.getByRole('combobox', { name: 'Find a film on the board' })
+  const results = page.getByRole('listbox').getByRole('option')
+  await expect(find).toBeFocused()
+  await find.fill('amelie')
+  await expect(results).toHaveText([/^Amélie 2001\s*Unplaced$/])
+  await find.press('Enter')
+  await expect(page.getByRole('toolbar', { name: 'Move Amélie to…' })).toBeVisible()
+  await expect(page.locator('[data-selected] [title^="Amélie"]')).toBeInViewport()
+  await page.keyboard.press('1')
+  await expect(page.locator('[data-tier]').first().locator('[title^="Amélie"]')).toHaveCount(1)
+  await find.fill('AMÉL')
+  await expect(results).toHaveText([/^Amélie 2001\s*S$/])
+  await find.fill('zzz')
+  await expect(results).toHaveCount(0)
+  await expect(page.getByText('No film here matches.', { exact: false })).toBeVisible()
+  await find.press('Escape')
+  await expect(find).toHaveValue('')
+
   // Mobile: the toolbar stays usable on a phone.
   await page.setViewportSize({ width: 390, height: 844 })
   await pool(page).first().click()
@@ -178,7 +202,7 @@ test('likes, lists and the director / actor filter', async ({ page }) => {
 
   const source = page.locator('main select').filter({ hasText: 'All watched' })
   // A list without its header block is named after its file.
-  await expect(source.locator('option')).toHaveText(['All watched (80)', 'Liked ♥ (4)', 'guilty pleasures (2)', 'Sci-fi favourites (3)'])
+  await expect(source.locator('option')).toHaveText(['All watched (80)', 'Liked ♥ (4)', 'Guilty pleasures (2)', 'Sci-fi favourites (3)'])
   await source.selectOption({ label: 'Liked ♥ (4)' })
   expect(await showing(page)).toBe(4)
   // Lists can hold films you haven't logged.

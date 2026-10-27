@@ -87,11 +87,14 @@ interface Actions {
 /**
  * IndexedDB storage for the persisted state. The state (whole library + poster cache) is stored as
  * an object, not a JSON string, and writes are batched: zustand calls `setItem` on every change,
- * and serialising everything for each drag or poster batch would be wasteful. A short delay keeps
- * a reload right after a change safe; pending writes are also flushed when the tab is hidden.
+ * and serialising everything for each drag or poster batch would be wasteful. Pending writes are
+ * flushed when the tab is hidden. An IndexedDB write started as the page unloads may never finish,
+ * so unsaved changes are also copied to localStorage then (synchronous), and picked up on the
+ * next load.
  */
 const pendingWrites = new Map<string, unknown>()
 let writeTimer: ReturnType<typeof setTimeout> | null = null
+const unloadKey = (name: string) => `unsaved:${name}`
 
 function flushWrites() {
   if (writeTimer) clearTimeout(writeTimer)
@@ -100,15 +103,40 @@ function flushWrites() {
   pendingWrites.clear()
 }
 
+function rescueWrites() {
+  for (const [name, value] of pendingWrites) {
+    try {
+      localStorage.setItem(unloadKey(name), JSON.stringify(value))
+    } catch {
+      // Too big for localStorage (or blocked): the IndexedDB write below is all we can do.
+    }
+  }
+  flushWrites()
+}
+
+/** Changes rescued when the last page unloaded, if any (read once). */
+function takeRescued(name: string): unknown {
+  try {
+    const text = localStorage.getItem(unloadKey(name))
+    if (text == null) return undefined
+    localStorage.removeItem(unloadKey(name))
+    const value: unknown = JSON.parse(text)
+    void set(name, value)
+    return value
+  } catch {
+    return undefined
+  }
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', flushWrites)
+  window.addEventListener('pagehide', rescueWrites)
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flushWrites())
 }
 
 function idbStorage<S>(): PersistStorage<S> {
   return {
     getItem: async (name) => {
-      const value = pendingWrites.get(name) ?? (await get(name))
+      const value = pendingWrites.get(name) ?? takeRescued(name) ?? (await get(name))
       // Older versions stored a JSON string.
       return (typeof value === 'string' ? JSON.parse(value) : (value ?? null)) as StorageValue<S> | null
     },

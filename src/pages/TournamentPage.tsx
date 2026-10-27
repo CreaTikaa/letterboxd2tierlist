@@ -204,6 +204,7 @@ function Results({ tournament: bracket }: { tournament: Tournament }) {
   return (
     <TournamentResults
       tournament={bracket}
+      title={t('tournament.imageTitle')}
       actions={
         <>
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>

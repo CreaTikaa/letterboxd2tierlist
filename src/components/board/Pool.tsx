@@ -32,6 +32,9 @@ export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPool
   const [limit, setLimit] = useState(PAGE)
   const t = useT()
   const shown = filmIds.slice(0, limit)
+  // The selected film (e.g. picked with "Find a film") shows even when it's past the current page.
+  const selected = cardOptions.selectedId
+  if (selected && filmIds.indexOf(selected) >= limit) shown.push(selected)
 
   return (
     <div className="space-y-2">
@@ -62,10 +65,10 @@ export function Pool({ filmIds, filmById, matches, cardOptions, poolSort, onPool
           return film ? <PoolPoster key={id} film={film} match={matches[id]} options={cardOptions} /> : null
         })}
       </div>
-      {filmIds.length > shown.length && (
+      {filmIds.length > limit && (
         <div className="flex justify-center gap-2">
           <Button variant="ghost" onClick={() => setLimit(limit + PAGE)}>
-            {t('pool.showMore', { count: Math.min(PAGE, filmIds.length - shown.length) })}
+            {t('pool.showMore', { count: Math.min(PAGE, filmIds.length - limit) })}
           </Button>
           <Button variant="ghost" onClick={() => setLimit(filmIds.length)}>
             {t('pool.showAll', { count: filmIds.length })}

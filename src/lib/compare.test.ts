@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareLists } from './compare'
+import { compareLists, rankingAsList, tournamentAsList } from './compare'
 import type { SharedList } from './share'
 
 const film = (name: string) => ({ name, year: 2000, poster: null })
@@ -22,5 +22,27 @@ describe('compareLists', () => {
 
   it('handles lists with nothing in common', () => {
     expect(compareLists(list(['A']), list(['B']))).toMatchObject({ common: [], agreement: 0 })
+  })
+})
+
+describe('rankings and tournaments', () => {
+  it('compares a ranking place by place', () => {
+    const ranking = rankingAsList({ title: 'R', films: ['A', 'B', 'C'].map(film) })
+    expect(ranking.tiers.map((t) => t.label)).toEqual(['#1', '#2', '#3'])
+    const result = compareLists(ranking, list(['C'], ['B'], ['A']))
+    expect(result.agreement).toBe(33)
+    expect(result.common[0]).toMatchObject({ name: 'A', tierA: 0, tierB: 2, gap: 1 })
+  })
+
+  it('groups a tournament by how far each film got', () => {
+    // Seeds A–D: A beats D, C upsets B, then C wins the final.
+    const seeds = ['A', 'B', 'C', 'D'].map(film)
+    const shared = { title: 'T', seeds, picks: [[0, 2], [2]] }
+    const tiers = tournamentAsList(shared, (place) => `place ${place}`).tiers
+    expect(tiers.map((t) => [t.label, t.films.map((f) => f.name)])).toEqual([
+      ['place 1', ['C']],
+      ['place 2', ['A']],
+      ['place 3', ['B', 'D']],
+    ])
   })
 })

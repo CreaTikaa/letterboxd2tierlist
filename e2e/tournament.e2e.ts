@@ -40,6 +40,9 @@ test('solo tournament: play, undo, bracket, share, send to tier list', async ({ 
 
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download image' }).click()])
   expect(fs.statSync((await download.path())!).size).toBeGreaterThan(10_000)
+  const [bracketImage] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download bracket image' }).click()])
+  expect(bracketImage.suggestedFilename()).toMatch(/^bracket-.*\.png$/)
+  expect(fs.statSync((await bracketImage.path())!).size).toBeGreaterThan(10_000)
 
   // Share link, opened by someone with no data and no TMDB key.
   const link = await copyLink(page, page.getByRole('button', { name: 'Share link' }))
@@ -61,6 +64,13 @@ test('solo tournament: play, undo, bracket, share, send to tier list', async ({ 
   await expect(tierCards(page, 0)).toHaveCount(1)
   expect(await tierCards(page, 0).first().getAttribute('title')).toContain(champion)
   await expect(tierCards(page, 3)).toHaveCount(4)
+
+  // The result compares with a tier list: how far each film got becomes its tier.
+  await page.goto(link)
+  await page.getByRole('button', { name: 'With my tier list' }).click()
+  await expect(page.getByText(/^agreement on 8 films in common/)).toBeVisible()
+  await expect(page.getByText(/^\d+%$/)).toBeVisible()
+  await expect(page.getByText('Runner-up', { exact: true }).first()).toBeVisible()
 })
 
 test('tournament from a list or from the films shown on the tier list', async ({ page }) => {
@@ -71,7 +81,7 @@ test('tournament from a list or from the films shown on the tier list', async ({
   await page.goto('/#/tournament')
 
   const source = page.locator('main select').filter({ hasText: 'All watched' })
-  await source.selectOption({ label: 'guilty pleasures (2)' })
+  await source.selectOption({ label: 'Guilty pleasures (2)' })
   await expect(page.getByText(/^2 films · 1 match/)).toBeVisible()
   await source.selectOption('visible')
   const shown = await source.locator('option:checked').innerText()
@@ -129,4 +139,10 @@ test('rank everything: break ties, undo, share, send to tier list', async ({ pag
   await expect(page.getByText(`Placed ${fives} films on your tier list.`)).toBeVisible()
   // Full mode cuts the ranking into slices: the #1 film opens the top tier.
   expect(await tierCards(page, 0).first().getAttribute('title')).toContain(order[0]!.replace(/^1\. /, ''))
+
+  // A ranking compares too, place by place.
+  await page.goto(link)
+  await page.getByRole('button', { name: 'With my tier list' }).click()
+  await expect(page.getByText(new RegExp(`^agreement on ${fives} films in common`))).toBeVisible()
+  await expect(page.locator('main ol li')).toHaveCount(fives)
 })

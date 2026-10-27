@@ -47,9 +47,35 @@ export function ViewPage({ code }: { code: string }) {
     )
   }
   const { item } = state
-  if (item.kind === 'tournament') return <SharedTournamentView tournament={item.tournament} />
-  if (item.kind === 'ranking') return <SharedRankingView ranking={item.ranking} />
+  if (item.kind === 'tournament') return <SharedTournamentView tournament={item.tournament} code={code} />
+  if (item.kind === 'ranking') return <SharedRankingView ranking={item.ranking} code={code} />
   return <SharedListView list={item.list} code={code} />
+}
+
+/** Compare what this link shows with your own tier list, or with another shared link. */
+function CompareBar({ code }: { code: string }) {
+  const t = useT()
+  const hasOwnBoard = useStore((s) => s.tiers.some((tier) => tier.filmIds.length > 0))
+  const [other, setOther] = useState('')
+  const otherCode = shareCodeFrom(other)
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-panel p-4 text-sm">
+      <span className="font-semibold">{t('compare.title')}</span>
+      {hasOwnBoard && <Button onClick={() => navigate({ page: 'compare', a: code, b: 'mine' })}>{t('compare.withMine')}</Button>}
+      <form
+        className="flex min-w-0 flex-1 flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (otherCode) navigate({ page: 'compare', a: code, b: otherCode })
+        }}
+      >
+        <input value={other} onChange={(e) => setOther(e.target.value)} placeholder={t('compare.pastePlaceholder')} className={`${inputClass} min-w-0 flex-1`} />
+        <Button type="submit" disabled={!otherCode}>
+          {t('compare.go')}
+        </Button>
+      </form>
+    </div>
+  )
 }
 
 function MakeYourOwn() {
@@ -64,12 +90,9 @@ function MakeYourOwn() {
 function SharedListView({ list, code }: { list: SharedList; code: string }) {
   const t = useT()
   const notify = useStore((s) => s.notify)
-  const hasOwnBoard = useStore((s) => s.tiers.some((tier) => tier.filmIds.length > 0))
   const [exporting, setExporting] = useState(false)
-  const [other, setOther] = useState('')
   const board = useMemo(() => boardFromSharedList(list), [list])
   const filmById = useMemo(() => new Map(board.films.map((f) => [f.id, f])), [board])
-  const otherCode = shareCodeFrom(other)
 
   const exportPng = async () => {
     setExporting(true)
@@ -99,28 +122,12 @@ function SharedListView({ list, code }: { list: SharedList; code: string }) {
         </div>
       </div>
       <StaticTierList tiers={board.tiers} filmById={filmById} matches={board.matches} cardWidth={72} large />
-
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-panel p-4 text-sm">
-        <span className="font-semibold">{t('compare.title')}</span>
-        {hasOwnBoard && <Button onClick={() => navigate({ page: 'compare', a: code, b: 'mine' })}>{t('compare.withMine')}</Button>}
-        <form
-          className="flex min-w-0 flex-1 flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (otherCode) navigate({ page: 'compare', a: code, b: otherCode })
-          }}
-        >
-          <input value={other} onChange={(e) => setOther(e.target.value)} placeholder={t('compare.pastePlaceholder')} className={`${inputClass} min-w-0 flex-1`} />
-          <Button type="submit" disabled={!otherCode}>
-            {t('compare.go')}
-          </Button>
-        </form>
-      </div>
+      <CompareBar code={code} />
     </div>
   )
 }
 
-function SharedTournamentView({ tournament }: { tournament: SharedTournament }) {
+function SharedTournamentView({ tournament, code }: { tournament: SharedTournament; code: string }) {
   const t = useT()
   const notify = useStore((s) => s.notify)
   const { imageTexts } = useTournamentText()
@@ -143,6 +150,7 @@ function SharedTournamentView({ tournament }: { tournament: SharedTournament }) 
       <h1 className="text-center text-2xl font-bold">{tournament.title}</h1>
       <TournamentResults
         tournament={bracket}
+        title={tournament.title}
         matches={matches}
         readOnly
         actions={
@@ -154,11 +162,12 @@ function SharedTournamentView({ tournament }: { tournament: SharedTournament }) 
           </>
         }
       />
+      <CompareBar code={code} />
     </div>
   )
 }
 
-function SharedRankingView({ ranking }: { ranking: SharedRanking }) {
+function SharedRankingView({ ranking, code }: { ranking: SharedRanking; code: string }) {
   const t = useT()
   const { films, matches } = useMemo(() => rankingFromShared(ranking), [ranking])
   return (
@@ -171,6 +180,7 @@ function SharedRankingView({ ranking }: { ranking: SharedRanking }) {
         <MakeYourOwn />
       </div>
       <RankingList films={films} matches={matches} />
+      <CompareBar code={code} />
     </div>
   )
 }

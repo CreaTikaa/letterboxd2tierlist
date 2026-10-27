@@ -22,6 +22,7 @@ import type { Film, Match, PoolSort, Tier } from '../../lib/types'
 import { useT } from '../../i18n'
 import { useStore } from '../../store/useStore'
 import { Button } from '../ui'
+import { FindFilm } from './FindFilm'
 import { POOL_ID, Pool } from './Pool'
 import { PosterCard, type CardOptions } from './PosterCard'
 import { TierRow } from './TierRow'
@@ -71,6 +72,18 @@ export function Board({ tiers, films, matches, onTiersChange, history, poolSort,
   // Tap/click a poster to select it, then a tier (or a number key) to send it there.
   const [rawSelectedId, setSelectedId] = useState<string | null>(null)
   const toggleSelect = useCallback((film: Film) => setSelectedId((id) => (id === film.id ? null : film.id)), [])
+  // A film picked with "Find a film" gets selected, then scrolled to once its card is on screen.
+  const [found, setFound] = useState<{ id: string } | null>(null)
+  const find = useCallback((film: Film) => {
+    setSelectedId(film.id)
+    setFound({ id: film.id })
+  }, [])
+  useEffect(() => {
+    if (!found) return
+    const card = document.querySelector(`[data-film-id="${CSS.escape(found.id)}"]`)
+    card?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    card?.firstElementChild?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }], { duration: 450, iterations: 2, delay: 250 })
+  }, [found])
   // A selected film that gets filtered out or removed simply stops being selected.
   const selectedId = rawSelectedId && films.some((f) => f.id === rawSelectedId) ? rawSelectedId : null
   const cardOptions = useMemo<CardOptions>(
@@ -225,6 +238,7 @@ export function Board({ tiers, films, matches, onTiersChange, history, poolSort,
             </span>
           )}
           {toolbar}
+          <FindFilm films={films} tiers={tiers} matches={matches} onPick={find} />
           <span className="ml-auto text-xs text-muted">{hint ?? t('board.hint')}</span>
         </div>
 

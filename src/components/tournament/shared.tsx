@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
-import { genreLabel, useLocale, useT } from '../../i18n'
+import { useMemo, useState, type ReactNode } from 'react'
+import { errorMessage, genreLabel, useLocale, useT } from '../../i18n'
 import { Trans } from '../../i18n/Trans'
 import { useTournamentText } from '../../i18n/tournamentText'
+import { dateStamp, downloadBlob } from '../../lib/download'
+import { renderBracketPng } from '../../lib/export/bracketPng'
 import { countByGenre } from '../../lib/filter'
 import { ratingText, stars } from '../../lib/ratings'
 import { posterUrl } from '../../lib/tmdb/client'
@@ -198,12 +200,15 @@ export function MatchHeader({ tournament: bracket, round, match }: { tournament:
 /** Champion, upsets and final standings. `actions` go under the champion; `children` at the end. */
 export function TournamentResults({
   tournament: bracket,
+  title,
   actions,
   children,
   matches: matchesOverride,
   readOnly = false,
 }: {
   tournament: Tournament
+  /** Shown on the bracket image. */
+  title: string
   actions: ReactNode
   children?: ReactNode
   /** Posters for a shared bracket (instead of your own cache). */
@@ -214,9 +219,11 @@ export function TournamentResults({
   const ownMatches = useStore((s) => s.matches)
   const matches = matchesOverride ?? ownMatches
   const setEditingFilm = useStore((s) => s.setEditingFilm)
+  const notify = useStore((s) => s.notify)
   const t = useT()
   const locale = useLocale()
-  const { roundLabel, placeLabel } = useTournamentText()
+  const { roundLabel, placeLabel, bracketTexts } = useTournamentText()
+  const [exporting, setExporting] = useState(false)
   const seedOf = useSeedLookup(bracket)
   const winner = seedOf.get(champion(bracket)!)!
   const table = standings(bracket)
@@ -224,6 +231,17 @@ export function TournamentResults({
   const topUpsets = upsets(bracket).slice(0, 3)
   const winnerMatch = matches[winner.film.id]
   const winnerPoster = winnerMatch?.status === 'matched' && winnerMatch.posterPath ? posterUrl(winnerMatch.posterPath, 'w500') : null
+
+  const exportBracket = async () => {
+    setExporting(true)
+    try {
+      downloadBlob(await renderBracketPng(bracket, matches, bracketTexts(title, bracket)), `bracket-${dateStamp()}.png`)
+    } catch (error) {
+      notify({ kind: 'error', text: t('common.imageFailed', { message: errorMessage(t, error) }) })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 py-4">
@@ -296,8 +314,11 @@ export function TournamentResults({
 
       <details className="rounded-xl bg-panel/50 p-4">
         <summary className="cursor-pointer font-semibold">{t('bracket.title')}</summary>
-        <div className="mt-3">
+        <div className="mt-3 space-y-3">
           <BracketView bracket={bracket} matches={matches} />
+          <Button disabled={exporting} onClick={() => void exportBracket()}>
+            {exporting ? t('common.rendering') : t('bracket.download')}
+          </Button>
         </div>
       </details>
     </div>

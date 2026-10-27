@@ -324,6 +324,7 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
   return (
     <TournamentResults
       tournament={bracket}
+      title={t('groupTournament.imageTitle', { room: view.state.id })}
       actions={
         <>
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>
