@@ -10,12 +10,16 @@ export interface Member {
 
 export type ShowdownPhase = 'idle' | 'ranking' | 'reveal' | 'results'
 
+/** "guess": lists are revealed anonymously and everyone guesses who made each one. */
+export type ShowdownMode = 'classic' | 'guess'
+
 /**
  * "Showdown": everyone ranks the same films on their own board, boards are revealed together,
  * then everyone votes for the best and worst list.
  */
 export interface Showdown {
   phase: ShowdownPhase
+  mode: ShowdownMode
   /** Increments with every new showdown so private drafts from older rounds are ignored. */
   round: number
   filmIds: string[]
@@ -24,6 +28,8 @@ export interface Showdown {
   /** Locked-in boards by member id (kept hidden in the UI until the reveal). */
   boards: Record<string, Tier[]>
   votes: Record<string, { best: string | null; worst: string | null }>
+  /** Guess mode: guesserId → list owner id → who they think made it. */
+  guesses: Record<string, Record<string, string>>
 }
 
 /** One record per decided match, for showing vote splits. */
@@ -49,6 +55,12 @@ export interface RoomTournament {
 
 export interface RoomState {
   id: string
+  /**
+   * True for the creator's copy, copies received from an anchored host, and saved copies. A fresh
+   * copy made by someone who opened an invite link isn't anchored, so it can never replace the
+   * real room, however many changes it made before connecting.
+   */
+  anchored: boolean
   /** Bumped by the host for every applied op; used to order ops and pick the freshest copy. */
   version: number
   members: Record<string, Member>
@@ -62,10 +74,11 @@ export type Op =
   | { t: 'member'; member: Member }
   | { t: 'member-remove'; memberId: string }
   | { t: 'board'; tiers: Tier[] }
-  | { t: 'sd-start'; round: number; filmIds: string[]; tiers: Tier[] }
+  | { t: 'sd-start'; round: number; filmIds: string[]; tiers: Tier[]; mode: ShowdownMode }
   | { t: 'sd-lock'; memberId: string; tiers: Tier[] | null }
   | { t: 'sd-phase'; phase: ShowdownPhase }
   | { t: 'sd-vote'; memberId: string; best: string | null; worst: string | null }
+  | { t: 'sd-guess'; memberId: string; ownerId: string; guessId: string | null }
   | { t: 'tn-start'; bracket: Tournament }
   /** `matchKey` ties the vote to one match so late votes can't leak into the next one. */
   | { t: 'tn-vote'; memberId: string; matchKey: string; filmId: string }

@@ -1,17 +1,20 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { ExportDialog } from './components/ExportDialog'
 import { Header } from './components/Header'
 import { MatchDialog } from './components/MatchDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Toast } from './components/Toast'
 import { useHydrated } from './hooks'
-import { RoomPage } from './pages/RoomPage'
-import { RoomsLobby } from './pages/RoomsLobby'
 import { TierListPage } from './pages/TierListPage'
-import { TournamentPage } from './pages/TournamentPage'
 import { useRoute } from './router'
 import { startEnrichment } from './store/enrichment'
 import { useStore } from './store/useStore'
+
+// Pages other than the tier list load on demand to keep the first load small.
+const RoomPage = lazy(() => import('./pages/RoomPage').then((m) => ({ default: m.RoomPage })))
+const RoomsLobby = lazy(() => import('./pages/RoomsLobby').then((m) => ({ default: m.RoomsLobby })))
+const TournamentPage = lazy(() => import('./pages/TournamentPage').then((m) => ({ default: m.TournamentPage })))
+const ViewPage = lazy(() => import('./pages/ViewPage').then((m) => ({ default: m.ViewPage })))
 
 type DialogName = 'settings' | 'export' | null
 
@@ -36,10 +39,13 @@ export default function App() {
       <Header onSettings={openSettings} onExport={() => setDialog('export')} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-4 px-4 py-4">
-        {route.page === 'tierlist' && <TierListPage onOpenSettings={openSettings} />}
-        {route.page === 'rooms' && <RoomsLobby />}
-        {route.page === 'room' && <RoomPage key={route.roomId} roomId={route.roomId} onOpenSettings={openSettings} />}
-        {route.page === 'tournament' && <TournamentPage />}
+        <Suspense fallback={<p className="py-10 text-center text-muted">Loading…</p>}>
+          {route.page === 'tierlist' && <TierListPage onOpenSettings={openSettings} />}
+          {route.page === 'rooms' && <RoomsLobby />}
+          {route.page === 'room' && <RoomPage key={route.roomId} roomId={route.roomId} linkPassword={route.password} onOpenSettings={openSettings} />}
+          {route.page === 'tournament' && <TournamentPage />}
+          {route.page === 'view' && <ViewPage code={route.code} />}
+        </Suspense>
       </main>
 
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">

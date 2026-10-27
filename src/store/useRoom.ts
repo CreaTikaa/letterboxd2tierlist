@@ -9,9 +9,13 @@ import { useStore } from './useStore'
 
 interface RoomStore {
   roomId: string | null
+  /** Password used for the current connection ('' = none). */
+  password: string
   view: SessionView | null
   error: string | null
-  join: (roomId: string) => Promise<void>
+  /** Someone in the room uses a different password (or we have none and they do). */
+  passwordRejected: boolean
+  join: (roomId: string, password?: string) => Promise<void>
   leave: () => void
   dispatch: (op: Op) => void
 }
@@ -20,6 +24,12 @@ let session: RoomSession | null = null
 let cleanup: (() => void) | null = null
 /** Bumped by every join/leave so a join that's still loading knows it was superseded. */
 let joinToken = 0
+/** Rooms created in this tab (via "Create room"), not yet saved locally. */
+const createdRooms = new Set<string>()
+
+export function markRoomCreated(roomId: string) {
+  createdRooms.add(roomId)
+}
 
 const snapshotKey = (roomId: string) => `room:${roomId}`
 
@@ -55,14 +65,16 @@ function receiveMatches(incoming: Record<string, Match>) {
 
 export const useRoom = create<RoomStore>()((setState, getState) => ({
   roomId: null,
+  password: '',
   view: null,
   error: null,
+  passwordRejected: false,
 
-  join: async (roomId) => {
-    if (getState().roomId === roomId && session) return
+  join: async (roomId, password = '') => {
+    if (getState().roomId === roomId && getState().password === password && session) return
     getState().leave()
     const token = ++joinToken
-    setState({ roomId, view: null, error: null })
+    setState({ roomId, password, view: null, error: null, passwordRejected: false })
     useStore.getState().rememberRoom(roomId)
 
     // The WebRTC library is only downloaded once someone opens a room.
@@ -87,12 +99,15 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
       }, 700)
     }
 
-    const transport = trysteroTransport(roomId, (message) => setState({ error: message }))
+    const transport = trysteroTransport(roomId, password, (message) =>
+      setState(/password/i.test(message) ? { passwordRejected: true, error: null } : { error: message }),
+    )
     const current = new RoomSession(transport, {
       roomId,
       memberId: profile.memberId,
       name: profile.name || 'Anonymous',
       initialState: saved,
+      creating: createdRooms.has(roomId),
       onChange: (view) => {
         latest = view.state
         save()
@@ -139,7 +154,7 @@ export const useRoom = create<RoomStore>()((setState, getState) => ({
     cleanup?.()
     cleanup = null
     session = null
-    setState({ roomId: null, view: null, error: null })
+    setState({ roomId: null, password: '', view: null, error: null, passwordRejected: false })
   },
 
   dispatch: (op) => session?.dispatch(op),
@@ -155,7 +170,13 @@ export const useShowdownDrafts = create<DraftStore>()(
   persist(
     (setState) => ({
       drafts: {},
-      setDraft: (key, tiers) => setState((s) => ({ drafts: { ...s.drafts, [key]: tiers } })),
+      setDraft: (key, tiers) =>
+        setState((s) => {
+          // Keys are "room:round"; drafts from earlier rounds of the same room are no longer needed.
+          const room = key.split(':')[0]
+          const others = Object.fromEntries(Object.entries(s.drafts).filter(([k]) => k.split(':')[0] !== room))
+          return { drafts: { ...others, [key]: tiers } }
+        }),
     }),
     { name: 'letterboxd2tierlist-drafts', storage: createJSONStorage(() => localStorage) },
   ),

@@ -12,6 +12,8 @@ import { AutoFillDialog } from '../AutoFillDialog'
 import { Board } from '../board/Board'
 import { EnrichmentStatus } from '../EnrichmentStatus'
 import { FilterBar } from '../FilterBar'
+import { sharedListFromBoard } from '../../lib/share'
+import { ShareLinkButton } from '../ShareLinkButton'
 import { Button, inputClass } from '../ui'
 
 const groupBadge = (film: Film) => {
@@ -38,7 +40,7 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [exporting, setExporting] = useState(false)
 
   const eligible = useMemo(() => films.filter((f) => f.watchers.length >= minWatchers), [films, minWatchers])
-  const visible = useMemo(() => filterFilms(eligible, filters), [eligible, filters])
+  const visible = useMemo(() => filterFilms(eligible, filters, matches), [eligible, filters, matches])
   const setFilters = useCallback((changes: Partial<Filters>) => setFiltersState((f) => ({ ...f, ...changes })), [])
   const setBoard = useCallback((tiers: typeof board) => dispatch({ t: 'board', tiers }), [dispatch])
   const openFilm = useCallback((film: Film) => setEditingFilm(film), [setEditingFilm])
@@ -78,6 +80,7 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
         onChange={setFilters}
         visibleCount={visible.length}
         ratingLabel="Group avg"
+        matches={matches}
         extra={
           <label className="flex items-center gap-1.5 text-muted">
             Seen by at least
@@ -103,9 +106,12 @@ export function GroupBoard({ onOpenSettings }: { onOpenSettings: () => void }) {
         badge={groupBadge}
         hint="Everyone in the room edits this board live"
         toolbar={
-          <Button variant="ghost" disabled={exporting} onClick={() => void exportPng()}>
-            {exporting ? 'Rendering…' : 'Download PNG'}
-          </Button>
+          <>
+            <Button variant="ghost" disabled={exporting} onClick={() => void exportPng()}>
+              {exporting ? 'Rendering…' : 'Download PNG'}
+            </Button>
+            <ShareLinkButton build={() => sharedListFromBoard(`Room ${view.state.id} · group tier list`, board, visible, matches)} label="Share link" />
+          </>
         }
       />
       <AutoFillDialog

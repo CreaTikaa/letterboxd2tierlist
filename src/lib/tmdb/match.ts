@@ -45,6 +45,7 @@ export const toMatch = (movie: TmdbMovie, manual = false): Match => ({
   title: movie.title,
   year: releaseYear(movie),
   posterPath: movie.poster_path,
+  genreIds: movie.genre_ids ?? movie.genres?.map((g) => g.id) ?? [],
   ...(manual && { manual }),
 })
 

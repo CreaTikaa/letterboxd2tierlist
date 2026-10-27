@@ -29,7 +29,7 @@ export function TierListPage({ onOpenSettings }: { onOpenSettings: () => void })
   return (
     <>
       <EnrichmentStatus onOpenSettings={onOpenSettings} />
-      <FilterBar films={films} filters={filters} onChange={setFilters} visibleCount={visible.length} />
+      <FilterBar films={films} filters={filters} onChange={setFilters} visibleCount={visible.length} matches={matches} />
       <Board
         tiers={tiers}
         films={visible}

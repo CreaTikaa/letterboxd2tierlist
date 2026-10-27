@@ -12,10 +12,12 @@ import {
   seedFilms,
   seedPositions,
   standings,
+  standingsToTiers,
   undo,
   upsets,
   type Tournament,
 } from './tournament'
+import { defaultTiers } from './tiers'
 import type { Film } from './types'
 
 const film = (id: string, rating: number | null = null): Film => ({ id, name: id, year: 2000, uri: '', rating, watchedDate: null })
@@ -132,5 +134,23 @@ describe('results', () => {
     const list = upsets(t)
     expect(list[0]).toMatchObject({ winnerId: 's4', loserId: 's1', gap: 3 })
     expect(list.every((u) => u.gap > 0)).toBe(true)
+  })
+})
+
+describe('standingsToTiers', () => {
+  it('puts the champion in S, runner-up in A, semis in B, quarters in C', () => {
+    const t = playOut(createTournament(seeds(8)))
+    const tiers = standingsToTiers(t, defaultTiers())
+    expect(tiers.map((tier) => tier.filmIds)).toEqual([['s1'], ['s2'], ['s3', 's4'], ['s5', 's6', 's7', 's8'], [], []])
+  })
+
+  it('sends deeper rounds to the last tier and keeps other films where they were', () => {
+    const t = playOut(createTournament(seeds(32)))
+    const board = defaultTiers().slice(0, 3)
+    board[1].filmIds = ['other', 's1']
+    const tiers = standingsToTiers(t, board)
+    expect(tiers[0].filmIds).toEqual(['s1'])
+    expect(tiers[1].filmIds).toEqual(['other', 's2'])
+    expect(tiers[2].filmIds).toHaveLength(30)
   })
 })

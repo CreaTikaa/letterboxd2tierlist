@@ -3,9 +3,12 @@ import type { Transport } from './transport'
 
 const APP_ID = 'letterboxd2tierlist-v1'
 
-/** Peer-to-peer transport over WebRTC; peers find each other through public Nostr relays. */
-export function trysteroTransport(roomId: string, onError: (message: string) => void): Transport {
-  const room = joinRoom({ appId: APP_ID }, roomId, {
+/**
+ * Peer-to-peer transport over WebRTC; peers find each other through public Nostr relays.
+ * With a password, only peers using the same one can connect (signalling is encrypted with it).
+ */
+export function trysteroTransport(roomId: string, password: string, onError: (message: string) => void): Transport {
+  const room = joinRoom({ appId: APP_ID, ...(password && { password }) }, roomId, {
     onJoinError: ({ error }) => onError(error),
   })
   return {

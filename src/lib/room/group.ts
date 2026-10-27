@@ -1,4 +1,4 @@
-import { shuffle } from '../random'
+import { seededRandom, shuffle } from '../random'
 import type { Film, Tier } from '../types'
 import type { Member, Showdown } from './types'
 
@@ -98,6 +98,39 @@ export function showdownResults(showdown: Showdown): ShowdownResults {
     controversial: controversial.sort((a, b) => b.spread - a.spread),
     unanimous,
   }
+}
+
+/** Order of the lists in a guess-mode reveal: shuffled, but identical for everyone in the room. */
+export function anonymousOrder(showdown: Showdown): string[] {
+  const owners = Object.keys(showdown.boards).sort()
+  return shuffle(owners, seededRandom(`${showdown.round}:${owners.join(',')}`))
+}
+
+export const listLabel = (index: number) => `List ${String.fromCharCode(65 + (index % 26))}`
+
+export interface GuessResults {
+  /** Who guessed the most authors right. `total` is how many lists they could guess (everyone's but their own). */
+  detectives: { memberId: string; correct: number; total: number }[]
+  /** How many guessers recognised each list's author. */
+  recognised: { ownerId: string; correct: number; guessers: number }[]
+}
+
+export function guessResults(showdown: Showdown): GuessResults {
+  const owners = Object.keys(showdown.boards)
+  const detectives = Object.entries(showdown.guesses)
+    .map(([memberId, guesses]) => ({
+      memberId,
+      correct: owners.filter((owner) => owner !== memberId && guesses[owner] === owner).length,
+      total: owners.filter((owner) => owner !== memberId).length,
+    }))
+    .sort((a, b) => b.correct - a.correct)
+  const recognised = owners
+    .map((ownerId) => {
+      const about = Object.entries(showdown.guesses).filter(([guesser, guesses]) => guesser !== ownerId && guesses[ownerId])
+      return { ownerId, correct: about.filter(([, guesses]) => guesses[ownerId] === ownerId).length, guessers: about.length }
+    })
+    .sort((a, b) => b.correct - a.correct)
+  return { detectives, recognised }
 }
 
 const MEMBER_COLORS = ['#ff8000', '#00e054', '#40bcf4', '#e85dff', '#ffd84a', '#ff5c7a', '#7cf0c5', '#a98bff']

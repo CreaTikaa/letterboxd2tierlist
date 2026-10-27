@@ -8,7 +8,9 @@ import { sortFilms } from '../lib/filter'
 import { placedIds } from '../lib/tiers'
 import type { Film } from '../lib/types'
 import { importFromFiles } from '../store/importFromFiles'
+import { sharedListFromBoard } from '../lib/share'
 import { useStore } from '../store/useStore'
+import { ShareLinkButton } from './ShareLinkButton'
 import { Button, Dialog, ProgressBar, Section, inputClass } from './ui'
 
 type Scope = 'visible' | 'board' | 'pool'
@@ -104,6 +106,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
           <input type="checkbox" checked={includeUnplaced} onChange={(e) => setIncludeUnplaced(e.target.checked)} className="accent-lb-green" />
           Add unplaced films as a last row ({pool.length})
         </label>
+        <ShareLinkButton build={() => sharedListFromBoard(title, tiers, onBoard, matches)} label="Copy share link (read-only)" />
         {pngProgress ? (
           <ProgressBar value={pngProgress.done} max={pngProgress.total} />
         ) : (

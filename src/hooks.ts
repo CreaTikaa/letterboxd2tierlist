@@ -14,5 +14,6 @@ export function useHydrated() {
 export function useVisibleFilms() {
   const films = useStore((s) => s.films)
   const filters = useStore((s) => s.filters)
-  return useMemo(() => filterFilms(films, filters), [films, filters])
+  const matches = useStore((s) => s.matches)
+  return useMemo(() => filterFilms(films, filters, matches), [films, filters, matches])
 }

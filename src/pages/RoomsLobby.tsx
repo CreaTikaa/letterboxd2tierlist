@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { Button, inputClass } from '../components/ui'
 import { randomId } from '../lib/random'
 import { navigate } from '../router'
+import { markRoomCreated } from '../store/useRoom'
 import { useStore } from '../store/useStore'
 
 /** Accepts a bare code or a full invite link. */
 function parseRoomCode(text: string): string | null {
-  const code = text.trim().match(/(?:#\/room\/)?([a-z0-9-]{4,32})\/?$/i)?.[1]
+  const code = text.trim().match(/(?:#\/room\/)?([a-z0-9-]{4,32})\/?(?:\?.*)?$/i)?.[1]
   return code ? code.toLowerCase() : null
 }
 
@@ -14,8 +15,17 @@ export function RoomsLobby() {
   const name = useStore((s) => s.profile.name)
   const setName = useStore((s) => s.setProfileName)
   const recentRooms = useStore((s) => s.recentRooms)
+  const roomPasswords = useStore((s) => s.roomPasswords)
+  const setRoomPassword = useStore((s) => s.setRoomPassword)
   const [code, setCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [joinPassword, setJoinPassword] = useState('')
   const parsed = parseRoomCode(code)
+
+  const open = (roomId: string, password: string) => {
+    if (password) setRoomPassword(roomId, password)
+    navigate({ page: 'room', roomId })
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">
@@ -38,7 +48,23 @@ export function RoomsLobby() {
         <div className="flex flex-col gap-3 rounded-xl bg-panel p-5">
           <h2 className="text-lg font-semibold">Create a room</h2>
           <p className="flex-1 text-sm text-muted">You get a link to share. The room stays alive as long as someone has it open.</p>
-          <Button variant="primary" disabled={!name.trim()} onClick={() => navigate({ page: 'room', roomId: randomId(6) })}>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Password (optional)"
+            autoComplete="new-password"
+            className={inputClass}
+          />
+          <Button
+            variant="primary"
+            disabled={!name.trim()}
+            onClick={() => {
+              const roomId = randomId(6)
+              markRoomCreated(roomId)
+              open(roomId, newPassword.trim())
+            }}
+          >
             Create room
           </Button>
         </div>
@@ -46,11 +72,21 @@ export function RoomsLobby() {
           className="flex flex-col gap-3 rounded-xl bg-panel p-5"
           onSubmit={(e) => {
             e.preventDefault()
-            if (parsed) navigate({ page: 'room', roomId: parsed })
+            // A pasted invite link may already carry the password.
+            const linkPassword = code.match(/[?&]pw=([^&]+)/)?.[1]
+            if (parsed) open(parsed, joinPassword.trim() || (linkPassword ? decodeURIComponent(linkPassword) : ''))
           }}
         >
           <h2 className="text-lg font-semibold">Join a room</h2>
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Room code or invite link" className={inputClass} />
+          <input
+            type="password"
+            value={joinPassword}
+            onChange={(e) => setJoinPassword(e.target.value)}
+            placeholder="Password (if the room has one)"
+            autoComplete="off"
+            className={inputClass}
+          />
           <Button type="submit" disabled={!name.trim() || !parsed}>
             Join
           </Button>
@@ -64,6 +100,7 @@ export function RoomsLobby() {
           <div className="flex flex-wrap gap-2">
             {recentRooms.map((id) => (
               <a key={id} href={`#/room/${id}`} className="rounded-md bg-panel px-3 py-1.5 font-mono text-sm hover:bg-raised">
+                {roomPasswords[id] && '🔒 '}
                 {id}
               </a>
             ))}
