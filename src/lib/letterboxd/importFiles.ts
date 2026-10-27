@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { AppError } from '../errors'
 import type { Film } from '../types'
 import { mergeExport, type ExportCsvs } from './parse'
 
@@ -33,9 +34,9 @@ export async function readLetterboxdFiles(files: File[]): Promise<Film[]> {
   }
 
   if (!csvs.watched && !csvs.ratings) {
-    throw new Error('No watched.csv or ratings.csv found. Drop the ZIP from Letterboxd → Settings → Import & Export → Export your data.')
+    throw new AppError('noExportFiles', 'No watched.csv or ratings.csv found.')
   }
   const films = mergeExport(csvs)
-  if (films.length === 0) throw new Error('The export was read, but no films were found in it.')
+  if (films.length === 0) throw new AppError('noFilms', 'The export was read, but no films were found in it.')
   return films
 }

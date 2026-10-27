@@ -11,6 +11,8 @@ export interface TierRowData {
 export interface PngOptions {
   columns: number
   title: string
+  /** Credit line in the bottom corner. */
+  footer: string
 }
 
 const CARD_W = 120
@@ -106,7 +108,7 @@ export async function renderTierListPng(
   ctx.font = `400 13px ${FONT}`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  ctx.fillText('Made with letterboxd2tierlist · Posters from TMDB', width - 12, height - FOOTER_H / 2)
+  ctx.fillText(options.footer, width - 12, height - FOOTER_H / 2)
 
   images.forEach((image) => image.close())
   return canvasToBlob(canvas)

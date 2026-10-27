@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import { errorMessage, useT } from '../i18n'
+import { Trans } from '../i18n/Trans'
 import { validateKey } from '../lib/tmdb/client'
 import { startEnrichment, stopEnrichment } from '../store/enrichment'
 import { useStore } from '../store/useStore'
+import { LanguageSelect } from './Header'
 import { Button, Dialog, Section, inputClass } from './ui'
 
 type Status = { kind: 'idle' } | { kind: 'checking' } | { kind: 'ok' } | { kind: 'error'; message: string }
 
 export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT()
   return (
-    <Dialog open={open} onClose={onClose} title="Settings">
+    <Dialog open={open} onClose={onClose} title={t('common.settings')}>
       <SettingsContent onClose={onClose} />
     </Dialog>
   )
@@ -24,6 +28,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
   const [draft, setDraft] = useState(tmdbKey)
   const [reveal, setReveal] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const t = useT()
 
   const save = async () => {
     const key = draft.trim()
@@ -35,20 +40,29 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
       setStatus({ kind: 'ok' })
       void startEnrichment()
     } catch (error) {
-      setStatus({ kind: 'error', message: error instanceof Error ? error.message : 'Could not reach TMDB' })
+      setStatus({ kind: 'error', message: errorMessage(t, error) })
     }
   }
 
   return (
     <>
-      <Section title="TMDB API key">
+      <Section title={t('settings.languageTitle')}>
+        <LanguageSelect className="w-full max-w-xs" />
+      </Section>
+
+      <Section title={t('settings.tmdbTitle')}>
         <p className="text-sm text-muted">
-          Posters come from The Movie Database. Create a free account, then copy the <span className="text-text">API Key</span> or the{' '}
-          <span className="text-text">API Read Access Token</span> from{' '}
-          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" className="text-lb-blue hover:underline">
-            themoviedb.org/settings/api
-          </a>
-          . It's stored only in this browser.
+          <Trans
+            k="settings.tmdbHelp"
+            tags={{
+              b: (text) => <span className="text-text">{text}</span>,
+              link: (text) => (
+                <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" className="text-lb-blue hover:underline">
+                  {text}
+                </a>
+              ),
+            }}
+          />
         </p>
         <form
           className="flex gap-2"
@@ -61,24 +75,24 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
             type={reveal ? 'text' : 'password'}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Paste your TMDB key"
+            placeholder={t('settings.keyPlaceholder')}
             autoComplete="off"
             spellCheck={false}
             className={`${inputClass} min-w-0 flex-1 font-mono`}
           />
-          <Button variant="ghost" onClick={() => setReveal(!reveal)} aria-label={reveal ? 'Hide key' : 'Show key'}>
-            {reveal ? 'Hide' : 'Show'}
+          <Button variant="ghost" onClick={() => setReveal(!reveal)} aria-label={reveal ? t('settings.hideKey') : t('settings.showKey')}>
+            {reveal ? t('settings.hide') : t('settings.show')}
           </Button>
           <Button type="submit" variant="primary" disabled={!draft.trim() || status.kind === 'checking'}>
-            {status.kind === 'checking' ? 'Checking…' : 'Save'}
+            {status.kind === 'checking' ? t('settings.checking') : t('settings.save')}
           </Button>
         </form>
-        {status.kind === 'ok' && <p className="text-sm text-lb-green">Key works. Fetching posters…</p>}
+        {status.kind === 'ok' && <p className="text-sm text-lb-green">{t('settings.keyWorks')}</p>}
         {status.kind === 'error' && <p className="text-sm text-red-400">{status.message}</p>}
       </Section>
 
-      <Section title="Data">
-        <p className="text-sm text-muted">Your library, board and poster matches are saved in this browser (IndexedDB).</p>
+      <Section title={t('settings.dataTitle')}>
+        <p className="text-sm text-muted">{t('settings.dataHelp')}</p>
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => {
@@ -88,21 +102,21 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
               onClose()
             }}
           >
-            Re-match all posters
+            {t('settings.rematch')}
           </Button>
           <Button
             variant="danger"
             onClick={() => {
-              if (!confirm('Delete your imported films, tier board and poster matches from this browser?')) return
+              if (!confirm(t('settings.deleteConfirm'))) return
               stopEnrichment()
               resetAll()
               onClose()
             }}
           >
-            Delete all data
+            {t('settings.deleteAll')}
           </Button>
         </div>
-        <p className="text-xs text-muted">Re-matching keeps the posters you picked by hand.</p>
+        <p className="text-xs text-muted">{t('settings.rematchHelp')}</p>
       </Section>
     </>
   )

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button, inputClass } from '../components/ui'
+import { useT } from '../i18n'
 import { randomId } from '../lib/random'
 import { navigate } from '../router'
 import { markRoomCreated } from '../store/useRoom'
@@ -21,6 +22,7 @@ export function RoomsLobby() {
   const [newPassword, setNewPassword] = useState('')
   const [joinPassword, setJoinPassword] = useState('')
   const parsed = parseRoomCode(code)
+  const t = useT()
 
   const open = (roomId: string, password: string) => {
     if (password) setRoomPassword(roomId, password)
@@ -30,29 +32,26 @@ export function RoomsLobby() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Rank films with your friends.</h1>
-        <p className="text-muted">
-          Create a room, send the link, and everyone adds their Letterboxd films. Build one shared tier list together, or run a showdown: everyone ranks the same
-          films in secret, then the lists are revealed and voted on.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t('lobby.heading')}</h1>
+        <p className="text-muted">{t('lobby.intro')}</p>
       </div>
 
       <div className="rounded-xl bg-panel p-5">
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-semibold">Your name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="How friends will see you" maxLength={24} className={`${inputClass} max-w-xs`} />
+          <span className="font-semibold">{t('lobby.yourName')}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('lobby.namePlaceholder')} maxLength={24} className={`${inputClass} max-w-xs`} />
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-3 rounded-xl bg-panel p-5">
-          <h2 className="text-lg font-semibold">Create a room</h2>
-          <p className="flex-1 text-sm text-muted">You get a link to share. The room stays alive as long as someone has it open.</p>
+          <h2 className="text-lg font-semibold">{t('lobby.createTitle')}</h2>
+          <p className="flex-1 text-sm text-muted">{t('lobby.createHelp')}</p>
           <input
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Password (optional)"
+            placeholder={t('lobby.passwordOptional')}
             autoComplete="new-password"
             className={inputClass}
           />
@@ -65,7 +64,7 @@ export function RoomsLobby() {
               open(roomId, newPassword.trim())
             }}
           >
-            Create room
+            {t('lobby.create')}
           </Button>
         </div>
         <form
@@ -77,26 +76,26 @@ export function RoomsLobby() {
             if (parsed) open(parsed, joinPassword.trim() || (linkPassword ? decodeURIComponent(linkPassword) : ''))
           }}
         >
-          <h2 className="text-lg font-semibold">Join a room</h2>
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Room code or invite link" className={inputClass} />
+          <h2 className="text-lg font-semibold">{t('lobby.joinTitle')}</h2>
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('lobby.codePlaceholder')} className={inputClass} />
           <input
             type="password"
             value={joinPassword}
             onChange={(e) => setJoinPassword(e.target.value)}
-            placeholder="Password (if the room has one)"
+            placeholder={t('lobby.passwordIfAny')}
             autoComplete="off"
             className={inputClass}
           />
           <Button type="submit" disabled={!name.trim() || !parsed}>
-            Join
+            {t('lobby.join')}
           </Button>
         </form>
       </div>
-      {!name.trim() && <p className="text-center text-sm text-lb-orange">Enter your name first.</p>}
+      {!name.trim() && <p className="text-center text-sm text-lb-orange">{t('lobby.nameFirst')}</p>}
 
       {recentRooms.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted">Recent rooms</h2>
+          <h2 className="text-sm font-semibold text-muted">{t('lobby.recent')}</h2>
           <div className="flex flex-wrap gap-2">
             {recentRooms.map((id) => (
               <a key={id} href={`#/room/${id}`} className="rounded-md bg-panel px-3 py-1.5 font-mono text-sm hover:bg-raised">
@@ -108,11 +107,7 @@ export function RoomsLobby() {
         </div>
       )}
 
-      <p className="text-xs text-muted">
-        Rooms are peer-to-peer: browsers talk directly to each other (WebRTC), with public Nostr relays only used to find each other. Nothing is stored on a
-        server; each person's browser keeps a copy of the room, so anyone can reopen it later. A few strict networks (some corporate or mobile ones) block
-        direct connections.
-      </p>
+      <p className="text-xs text-muted">{t('lobby.p2pNote')}</p>
     </div>
   )
 }

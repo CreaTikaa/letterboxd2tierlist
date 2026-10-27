@@ -1,3 +1,4 @@
+import { errorMessage, t } from '../i18n'
 import { parseSaveFile } from '../lib/export/saveFile'
 import { readLetterboxdFiles } from '../lib/letterboxd/importFiles'
 import { useStore } from './useStore'
@@ -10,16 +11,16 @@ export async function importFromFiles(files: File[]): Promise<boolean> {
     if (saveFile) {
       const save = parseSaveFile(await saveFile.text())
       loadSave(save)
-      notify({ kind: 'success', text: `Loaded tier list with ${save.films.length} films.` })
+      notify({ kind: 'success', text: t('import.loadedSave', { count: save.films.length }) })
     } else {
       const films = await readLetterboxdFiles(files)
       importFilms(films)
       const rated = films.filter((f) => f.rating != null).length
-      notify({ kind: 'success', text: `Imported ${films.length} films (${rated} rated).` })
+      notify({ kind: 'success', text: t('import.imported', { count: films.length, rated }) })
     }
     return true
   } catch (error) {
-    notify({ kind: 'error', text: error instanceof Error ? error.message : 'Could not read that file.' })
+    notify({ kind: 'error', text: error instanceof Error ? errorMessage(t, error) : t('errors.readFile') })
     return false
   }
 }

@@ -18,6 +18,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { sortFilms } from '../../lib/filter'
 import { addTier, clearTiers, moveTier, placedIds, removeTier, updateTier } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
+import { useT } from '../../i18n'
 import { useStore } from '../../store/useStore'
 import { Button } from '../ui'
 import { POOL_ID, Pool } from './Pool'
@@ -62,6 +63,7 @@ export interface BoardProps {
 export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSortChange, onAutoFill, onFilmClick, badge, toolbar, hint }: BoardProps) {
   const cardWidth = useStore((s) => s.cardWidth)
   const showRatings = useStore((s) => s.showRatings)
+  const t = useT()
   const cardOptions = useMemo<CardOptions>(() => ({ width: cardWidth, showRating: showRatings, badge, onClick: onFilmClick }), [cardWidth, showRatings, badge, onFilmClick])
 
   const filmById = useMemo(() => new Map(films.map((f) => [f.id, f])), [films])
@@ -162,16 +164,16 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {onAutoFill && (
-            <Button variant="primary" onClick={onAutoFill} title="Place every visible film in a tier based on its rating">
-              ★ Auto-fill by rating
+            <Button variant="primary" onClick={onAutoFill} title={t('board.autoFillTitle')}>
+              {t('board.autoFill')}
             </Button>
           )}
-          <Button onClick={() => onTiersChange(addTier(tiers))}>+ Add tier</Button>
-          <Button variant="ghost" disabled={placedCount === 0} onClick={() => confirm('Move every film back to the unplaced pool?') && onTiersChange(clearTiers(tiers))}>
-            Clear board
+          <Button onClick={() => onTiersChange(addTier(tiers, t('common.newTier')))}>{t('board.addTier')}</Button>
+          <Button variant="ghost" disabled={placedCount === 0} onClick={() => confirm(t('board.clearConfirm')) && onTiersChange(clearTiers(tiers))}>
+            {t('board.clear')}
           </Button>
           {toolbar}
-          <span className="ml-auto text-xs text-muted">{hint ?? 'Drag posters between tiers · click a poster for details'}</span>
+          <span className="ml-auto text-xs text-muted">{hint ?? t('board.hint')}</span>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-black bg-[#1a1a17]">
@@ -190,7 +192,7 @@ export function Board({ tiers, films, matches, onTiersChange, poolSort, onPoolSo
               onRemove={() => onTiersChange(removeTier(tiers, tier.id))}
             />
           ))}
-          {tiers.length === 0 && <p className="p-6 text-center text-sm text-muted">No tiers yet. Add one to start ranking.</p>}
+          {tiers.length === 0 && <p className="p-6 text-center text-sm text-muted">{t('board.noTiers')}</p>}
         </div>
 
         <Pool filmIds={items[POOL_ID]} filmById={filmById} matches={matches} cardOptions={cardOptions} poolSort={poolSort} onPoolSortChange={onPoolSortChange} />

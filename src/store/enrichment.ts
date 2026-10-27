@@ -2,7 +2,7 @@ import { runPool } from '../lib/pool'
 import { TmdbError, getMovie } from '../lib/tmdb/client'
 import { findMatch } from '../lib/tmdb/match'
 import type { Film, Match } from '../lib/types'
-import { useStore } from './useStore'
+import { useStore, type EnrichmentError } from './useStore'
 
 let controller: AbortController | null = null
 /** Films requested while a run was in progress; picked up by the next pass. */
@@ -31,7 +31,7 @@ export async function startEnrichment(films: Film[] = useStore.getState().films)
 
   const ctrl = new AbortController()
   controller = ctrl
-  let fatal: string | null = null
+  let fatal: EnrichmentError | null = null
   let failed = 0
   let done = 0
   let total = 0
@@ -63,7 +63,7 @@ export async function startEnrichment(films: Film[] = useStore.getState().films)
         } catch (error) {
           if (ctrl.signal.aborted) return
           if (error instanceof TmdbError && error.status === 401) {
-            fatal = error.message
+            fatal = { code: 'invalidKey' }
             ctrl.abort()
             return
           }
@@ -81,7 +81,7 @@ export async function startEnrichment(films: Film[] = useStore.getState().films)
   if (ctrl.signal.aborted) queued = new Map()
   useStore.getState().setEnrichment({
     running: false,
-    error: fatal ?? (failed ? `${failed} film${failed > 1 ? 's' : ''} couldn't be looked up (network error). Retry to try again.` : null),
+    error: fatal ?? (failed ? { code: 'failed', count: failed } : null),
   })
   controller = null
 }

@@ -6,9 +6,9 @@ import {
   entrants,
   nextPowerOfTwo,
   pick,
-  placeLabel,
+  placeRange,
   playableMatchCount,
-  roundName,
+  roundInfo,
   seedFilms,
   seedPositions,
   standings,
@@ -66,7 +66,9 @@ describe('bracket', () => {
   it('plays a full 8-film bracket in 7 matches', () => {
     let t = createTournament(seeds(8))
     expect(playableMatchCount(t)).toBe(7)
-    expect(roundName(t.size, 0)).toBe('Quarter-finals')
+    expect(roundInfo(t.size, 0)).toEqual({ kind: 'quarter', remaining: 8 })
+    expect(roundInfo(64, 0)).toEqual({ kind: 'roundOf', remaining: 64 })
+    expect(roundInfo(64, 5)).toEqual({ kind: 'final', remaining: 2 })
     expect(currentMatch(t)).toEqual({ round: 0, match: 0 })
     expect(entrants(t, 0, 0)).toEqual(['s1', 's8'])
     t = playOut(t)
@@ -117,9 +119,9 @@ describe('results', () => {
       ['s7', 5],
       ['s8', 5],
     ])
-    expect(placeLabel(1)).toBe('Champion')
-    expect(placeLabel(3)).toBe('3rd–4th')
-    expect(placeLabel(5)).toBe('5th–8th')
+    expect(placeRange(1)).toEqual([1, 1])
+    expect(placeRange(3)).toEqual([3, 4])
+    expect(placeRange(5)).toEqual([5, 8])
   })
 
   it('includes films that got a bye', () => {

@@ -1,6 +1,7 @@
 import { del, get, set } from 'idb-keyval'
 import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
+import { detectLanguage, type Language } from '../i18n/languages'
 import type { SaveFile } from '../lib/export/saveFile'
 import { DEFAULT_FILTERS } from '../lib/filter'
 import { randomId } from '../lib/random'
@@ -8,11 +9,13 @@ import { defaultRatingMap, defaultTiers } from '../lib/tiers'
 import type { Tournament } from '../lib/tournament'
 import type { Film, Filters, Match, PoolSort, RatingMap, Tier } from '../lib/types'
 
+export type EnrichmentError = { code: 'invalidKey' } | { code: 'failed'; count: number }
+
 export interface Enrichment {
   running: boolean
   done: number
   total: number
-  error: string | null
+  error: EnrichmentError | null
 }
 
 export interface Notice {
@@ -41,6 +44,7 @@ interface State {
   recentRooms: string[]
   /** Room passwords you've used, so rejoining doesn't ask again. */
   roomPasswords: Record<string, string>
+  language: Language
 }
 
 type PersistedState = Omit<State, 'enrichment' | 'editingFilm' | 'notice'>
@@ -65,6 +69,7 @@ interface Actions {
   setTournament: (tournament: Tournament | null) => void
   rememberRoom: (roomId: string) => void
   setRoomPassword: (roomId: string, password: string) => void
+  setLanguage: (language: Language) => void
 }
 
 /**
@@ -128,6 +133,7 @@ const initialState: State = {
   tournament: null,
   recentRooms: [],
   roomPasswords: {},
+  language: detectLanguage(),
 }
 
 export const useStore = create<State & Actions>()(
@@ -163,10 +169,11 @@ export const useStore = create<State & Actions>()(
           filters: { ...DEFAULT_FILTERS, ...save.filters },
         })),
       clearMatches: () => setState((s) => ({ matches: Object.fromEntries(Object.entries(s.matches).filter(([, m]) => m.status === 'matched' && m.manual)) })),
-      resetAll: () => setState((s) => ({ ...initialState, tmdbKey: s.tmdbKey, profile: s.profile })),
+      resetAll: () => setState((s) => ({ ...initialState, tmdbKey: s.tmdbKey, profile: s.profile, language: s.language })),
       notify: (notice) => setState({ notice }),
       setProfileName: (name) => setState((s) => ({ profile: { ...s.profile, name: name.slice(0, 24) } })),
       setTournament: (tournament) => setState({ tournament }),
+      setLanguage: (language) => setState({ language }),
       setRoomPassword: (roomId, password) =>
         setState((s) => {
           const { [roomId]: _old, ...rest } = s.roomPasswords

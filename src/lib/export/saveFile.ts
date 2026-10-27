@@ -1,3 +1,4 @@
+import { AppError } from '../errors'
 import type { Film, Filters, Match, RatingMap, Tier } from '../types'
 
 export interface SaveFile {
@@ -20,14 +21,14 @@ export function parseSaveFile(text: string): SaveFile {
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error('This file is not valid JSON.')
+    throw new AppError('notJson', 'This file is not valid JSON.')
   }
   const save = data as Partial<SaveFile>
   if (save?.app !== 'letterboxd2tierlist' || save.version !== 1) {
-    throw new Error('This is not a letterboxd2tierlist save file.')
+    throw new AppError('notSaveFile', 'This is not a letterboxd2tierlist save file.')
   }
   if (!Array.isArray(save.films) || !Array.isArray(save.tiers) || typeof save.matches !== 'object') {
-    throw new Error('The save file is incomplete or corrupted.')
+    throw new AppError('corruptSave', 'The save file is incomplete or corrupted.')
   }
   return save as SaveFile
 }

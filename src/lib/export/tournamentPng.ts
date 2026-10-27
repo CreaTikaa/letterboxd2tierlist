@@ -11,15 +11,29 @@ const FOOTER_H = 40
 const CAPTION_H = 64
 const LABEL_H = 44
 
+/** Text drawn on the image (translated by the caller). */
+export interface TournamentImageTexts {
+  title: string
+  /** e.g. "8 films · 7 matches" */
+  subtitle: string
+  champion: string
+  runnerUp: string
+  semiFinalists: string
+  quarterFinalists: string
+  /** e.g. "#3 seed" */
+  seed: (seed: number) => string
+  footer: string
+}
+
 /** Podium-style image: champion, runner-up, semi-finalists and quarter-finalists. */
-export async function renderTournamentPng(t: Tournament, matches: Record<string, Match>, title: string): Promise<Blob> {
+export async function renderTournamentPng(t: Tournament, matches: Record<string, Match>, texts: TournamentImageTexts): Promise<Blob> {
   const filmById = new Map(t.seeds.map((f, i) => [f.id, { film: f, seed: i + 1 }]))
   const results = standings(t)
   const rows = [
-    { label: 'Champion', width: 280, place: 1 },
-    { label: 'Runner-up', width: 200, place: 2 },
-    { label: 'Semi-finalists', width: 170, place: 3 },
-    { label: 'Quarter-finalists', width: 150, place: 5 },
+    { label: texts.champion, width: 280, place: 1 },
+    { label: texts.runnerUp, width: 200, place: 2 },
+    { label: texts.semiFinalists, width: 170, place: 3 },
+    { label: texts.quarterFinalists, width: 150, place: 5 },
   ]
     .map((row) => ({ ...row, films: results.filter((s) => s.place === row.place).map((s) => filmById.get(s.filmId)!) }))
     .filter((row) => row.films.length > 0)
@@ -46,10 +60,10 @@ export async function renderTournamentPng(t: Tournament, matches: Record<string,
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#fff'
   ctx.font = `700 40px ${FONT}`
-  ctx.fillText(title, WIDTH / 2, 48)
+  ctx.fillText(texts.title, WIDTH / 2, 48)
   ctx.fillStyle = '#99aabb'
   ctx.font = `400 18px ${FONT}`
-  ctx.fillText(`${t.seeds.length} films · ${t.history.length} matches`, WIDTH / 2, 86)
+  ctx.fillText(texts.subtitle, WIDTH / 2, 86)
 
   let y = HEADER_H
   for (const row of rows) {
@@ -83,7 +97,7 @@ export async function renderTournamentPng(t: Tournament, matches: Record<string,
       lines.forEach((line, i) => ctx.fillText(line, x + w / 2, top + h + 8 + i * 18))
       ctx.fillStyle = '#99aabb'
       ctx.font = `400 12px ${FONT}`
-      ctx.fillText(`#${seed} seed${film.year ? ` · ${film.year}` : ''}`, x + w / 2, top + h + 10 + lines.length * 18)
+      ctx.fillText(`${texts.seed(seed)}${film.year ? ` · ${film.year}` : ''}`, x + w / 2, top + h + 10 + lines.length * 18)
       x += w + GAP * scale
     }
     y += rowHeight(row.width) - (cardH - h)
@@ -93,7 +107,7 @@ export async function renderTournamentPng(t: Tournament, matches: Record<string,
   ctx.font = `400 13px ${FONT}`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  ctx.fillText('Made with letterboxd2tierlist · Posters from TMDB', WIDTH - 16, height - FOOTER_H / 2)
+  ctx.fillText(texts.footer, WIDTH - 16, height - FOOTER_H / 2)
 
   images.forEach((image) => image.close())
   return canvasToBlob(canvas)

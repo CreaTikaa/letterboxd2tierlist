@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { errorMessage, useLocale, useT } from '../../i18n'
+import { Trans } from '../../i18n/Trans'
+import { useTournamentText } from '../../i18n/tournamentText'
 import { dateStamp, downloadBlob } from '../../lib/download'
 import { renderTournamentPng } from '../../lib/export/tournamentPng'
 import { genresOf } from '../../lib/filter'
@@ -13,7 +16,6 @@ import {
   currentMatch,
   entrants,
   pickBracketSize,
-  roundName,
   seedFilms,
   standingsToTiers,
   type SelectionMode,
@@ -59,6 +61,7 @@ function Setup({ films }: { films: GroupFilm[] }) {
   const [shuffleKey, setShuffleKey] = useState(0)
   const [genre, setGenre] = useState(0)
   const matches = useStore((s) => s.matches)
+  const t = useT()
 
   // "Everyone" follows the member count as people join.
   const [lastSharing, setLastSharing] = useState(sharing)
@@ -78,44 +81,47 @@ function Setup({ films }: { films: GroupFilm[] }) {
   return (
     <div className="space-y-4">
       <div className="space-y-2 rounded-xl bg-panel p-5 text-sm">
-        <h2 className="text-lg font-semibold">Group tournament</h2>
+        <h2 className="text-lg font-semibold">{t('groupTournament.title')}</h2>
         <p className="text-muted">
-          One bracket for the whole room. Each matchup, everyone votes for the film they'd keep; when everyone online has voted, the majority wins (a tie goes to
-          the better seed). Films are seeded by their <span className="text-text">median rating</span> across the room, so one outlier can't sink a favourite.
+          <Trans k="groupTournament.intro" tags={{ b: (text) => <span className="text-text">{text}</span> }} />
         </p>
       </div>
 
       {!view.isHost ? (
         <p className="rounded-xl bg-panel p-5 text-sm text-muted">
-          Waiting for the host ({view.hostMemberId ? nameOf(view.hostMemberId) : 'connecting…'}) to start a tournament.
+          {t('groupTournament.waitingHost', { host: view.hostMemberId ? nameOf(view.hostMemberId) : t('showdown.connecting') })}
         </p>
       ) : sharing === 0 ? (
-        <p className="rounded-xl bg-panel p-5 text-sm text-muted">Someone needs to share their films first.</p>
+        <p className="rounded-xl bg-panel p-5 text-sm text-muted">{t('groupTournament.needFilms')}</p>
       ) : (
         <>
           <div className="grid gap-4 rounded-xl bg-panel p-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-muted">
-              Films seen by
+              {t('groupTournament.seenBy')}
               <select value={minWatchers} onChange={(e) => setMinWatchers(Number(e.target.value))} className={inputClass}>
                 {Array.from({ length: sharing }, (_, i) => sharing - i).map((n) => (
                   <option key={n} value={n}>
-                    {n === sharing ? (sharing > 1 ? `Everyone (${n})` : 'Everyone') : `At least ${n} ${n === 1 ? 'person' : 'people'}`}
+                    {n === sharing
+                      ? sharing > 1
+                        ? t('groupTournament.everyoneCount', { count: n })
+                        : t('groupTournament.everyone')
+                      : t('groupTournament.atLeast', { count: n })}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1 text-muted">
-              Minimum median rating
+              {t('groupTournament.minMedian')}
               <select value={minMedian} onChange={(e) => setMinMedian(Number(e.target.value))} className={inputClass}>
-                <option value={0}>Any (incl. unrated)</option>
+                <option value={0}>{t('groupTournament.anyInclUnrated')}</option>
                 {[...RATING_VALUES].reverse().map((r) => (
                   <option key={r} value={r}>
-                    {stars(r)} and up
+                    {t('tournament.andUp', { stars: stars(r) })}
                   </option>
                 ))}
               </select>
             </label>
-            <SelectionModeSelect value={mode} onChange={setMode} topLabel="Highest median" />
+            <SelectionModeSelect value={mode} onChange={setMode} topLabel={t('groupTournament.highestMedian')} />
             <GenreSelect films={qualifying} value={genre} onChange={setGenre} />
             <BracketSizeSelect value={count} options={options} onChange={setRequested} />
           </div>
@@ -125,12 +131,8 @@ function Setup({ films }: { films: GroupFilm[] }) {
             mode={mode}
             onReshuffle={() => setShuffleKey((k) => k + 1)}
             onStart={() => dispatch({ t: 'tn-start', bracket: createTournament(seeds) })}
-            startLabel="Start group tournament"
-            emptyMessage={
-              minWatchers > 1
-                ? 'Not enough films that enough of you have seen. Lower "Films seen by" or the minimum rating.'
-                : 'Not enough films match. Lower the minimum rating.'
-            }
+            startLabel={t('groupTournament.start')}
+            emptyMessage={minWatchers > 1 ? t('groupTournament.notEnoughSeen') : t('groupTournament.notEnough')}
           />
         </>
       )}
@@ -156,6 +158,7 @@ function RatingChips({ film }: { film: GroupFilm | undefined }) {
 
 function LastResult({ record, bracket }: { record: MatchRecord; bracket: Tournament }) {
   const seedOf = useSeedLookup(bracket)
+  const t = useT()
   const nameOf = useNameOf()
   const [a, b] = entrants(bracket, record.round, record.match)
   const loserId = a === record.winnerId ? b : a
@@ -165,16 +168,16 @@ function LastResult({ record, bracket }: { record: MatchRecord; bracket: Tournam
   const tie = loserId != null && counts.get(record.winnerId) === counts.get(loserId)
   return (
     <div className="rounded-lg bg-panel px-4 py-2 text-center text-sm">
-      <span className="text-muted">Last match: </span>
+      <span className="text-muted">{t('groupTournament.lastMatch')} </span>
       <span className="font-semibold text-lb-green">{winner.name}</span>
       {loser && (
         <>
           {' '}
-          beat {loser.name}{' '}
+          {t('groupTournament.beat', { loser: loser.name })}{' '}
           <span className="font-semibold">
             {counts.get(record.winnerId)}–{counts.get(loserId!)}
           </span>
-          {tie && <span className="text-muted"> (tie, better seed advances)</span>}
+          {tie && <span className="text-muted"> {t('groupTournament.tie')}</span>}
         </>
       )}
       {Object.keys(record.votes).length > 0 && (
@@ -202,6 +205,8 @@ function Voting({ tournament, bracket, groupById }: { tournament: RoomTournament
   const online = onlineMemberIds(view, me)
   const voted = Object.keys(tournament.votes)
   const lastRecord = tournament.log.at(-1)
+  const t = useT()
+  const locale = useLocale()
 
   const vote = (filmId: string) => dispatch({ t: 'tn-vote', memberId: me, matchKey: key, filmId })
 
@@ -216,7 +221,9 @@ function Voting({ tournament, bracket, groupById }: { tournament: RoomTournament
   })
 
   const state = (id: string): CardState => (myVote === id ? 'selected' : 'idle')
-  const subtitle = (film: { rating: number | null }) => <span className="text-lb-green">median {ratingText(film.rating)}</span>
+  const subtitle = (film: { rating: number | null }) => (
+    <span className="text-lb-green">{t('groupTournament.median', { rating: ratingText(film.rating, locale) || t('common.unrated') })}</span>
+  )
 
   const closeVote = () => {
     const winnerId = decideWinner(bracket, tournament.votes)
@@ -232,17 +239,17 @@ function Voting({ tournament, bracket, groupById }: { tournament: RoomTournament
         <MatchupCard
           film={a.film}
           seed={a.seed}
-          hint="← or 1"
+          hint={t('tournament.keyLeft')}
           state={state(a.film.id)}
           onPick={() => vote(a.film.id)}
           subtitle={subtitle(a.film)}
           footer={<RatingChips film={groupById.get(a.film.id)} />}
         />
-        <span className="mt-[30%] shrink-0 text-xl font-black text-muted sm:text-3xl">VS</span>
+        <span className="mt-[30%] shrink-0 text-xl font-black text-muted sm:text-3xl">{t('tournament.vs')}</span>
         <MatchupCard
           film={b.film}
           seed={b.seed}
-          hint="→ or 2"
+          hint={t('tournament.keyRight')}
           state={state(b.film.id)}
           onPick={() => vote(b.film.id)}
           subtitle={subtitle(b.film)}
@@ -252,12 +259,12 @@ function Voting({ tournament, bracket, groupById }: { tournament: RoomTournament
 
       <div className="space-y-2 rounded-xl bg-panel p-4 text-sm">
         <p className="text-center">
-          {myVote ? 'Vote cast; you can still change it until everyone has voted.' : 'Click a poster (or press ← / →) to vote.'}{' '}
-          <span className="text-muted">Votes are revealed when the match is decided.</span>
+          {myVote ? t('groupTournament.voteCast') : t('groupTournament.howToVote')}{' '}
+          <span className="text-muted">{t('groupTournament.votesHidden')}</span>
         </p>
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           {online.map((id) => (
-            <MemberTag key={id} memberId={id} suffix={tournament.votes[id] ? '✓ voted' : 'thinking…'} />
+            <MemberTag key={id} memberId={id} suffix={tournament.votes[id] ? t('groupTournament.voted') : t('groupTournament.thinking')} />
           ))}
         </div>
         {view.isHost && (
@@ -265,15 +272,15 @@ function Voting({ tournament, bracket, groupById }: { tournament: RoomTournament
             <Button
               onClick={closeVote}
               disabled={voted.length === 0}
-              title="Decide now with the votes so far (for when someone is away)"
+              title={t('groupTournament.closeVoteTitle')}
             >
-              Close vote ({voted.length}/{online.length})
+              {t('groupTournament.closeVote', { voted: voted.length, online: online.length })}
             </Button>
             <Button variant="ghost" disabled={!lastRecord} onClick={() => lastRecord && dispatch({ t: 'tn-undo', matchKey: matchKey(lastRecord.round, lastRecord.match) })}>
-              ↶ Undo last match
+              {t('groupTournament.undoLast')}
             </Button>
-            <Button variant="ghost" onClick={() => confirm('Stop the tournament for everyone?') && dispatch({ t: 'tn-reset' })}>
-              Stop tournament
+            <Button variant="ghost" onClick={() => confirm(t('groupTournament.stopConfirm')) && dispatch({ t: 'tn-reset' })}>
+              {t('groupTournament.stop')}
             </Button>
           </div>
         )}
@@ -290,13 +297,16 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
   const seedOf = useSeedLookup(bracket)
   const [exporting, setExporting] = useState(false)
   const lastRecord = tournament.log.at(-1)
+  const t = useT()
+  const { roundLabel, imageTexts } = useTournamentText()
 
   const exportPng = async () => {
     setExporting(true)
     try {
-      downloadBlob(await renderTournamentPng(bracket, matches, `Room ${view.state.id} tournament`), `room-${view.state.id}-tournament-${dateStamp()}.png`)
+      const texts = imageTexts(t('groupTournament.imageTitle', { room: view.state.id }), bracket)
+      downloadBlob(await renderTournamentPng(bracket, matches, texts), `room-${view.state.id}-tournament-${dateStamp()}.png`)
     } catch (error) {
-      notify({ kind: 'error', text: `Image export failed: ${error instanceof Error ? error.message : error}` })
+      notify({ kind: 'error', text: t('common.imageFailed', { message: errorMessage(t, error) }) })
     } finally {
       setExporting(false)
     }
@@ -315,25 +325,25 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
       actions={
         <>
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>
-            {exporting ? 'Rendering…' : 'Download image'}
+            {exporting ? t('common.rendering') : t('common.downloadImage')}
           </Button>
           <Button
             onClick={() => {
-              if (!confirm('Place these films on the group board by how far they got? This changes the board for everyone.')) return
+              if (!confirm(t('groupTournament.sendConfirm'))) return
               dispatch({ t: 'board', tiers: standingsToTiers(bracket, view.state.board) })
-              notify({ kind: 'success', text: 'Results sent to the group board.' })
+              notify({ kind: 'success', text: t('groupTournament.sent') })
             }}
           >
-            → Send to group board
+            {t('groupTournament.sendToBoard')}
           </Button>
           {view.isHost && (
             <>
-              <Button onClick={() => dispatch({ t: 'tn-start', bracket: createTournament(bracket.seeds) })}>Replay same films</Button>
+              <Button onClick={() => dispatch({ t: 'tn-start', bracket: createTournament(bracket.seeds) })}>{t('tournament.replay')}</Button>
               <Button variant="ghost" disabled={!lastRecord} onClick={() => lastRecord && dispatch({ t: 'tn-undo', matchKey: matchKey(lastRecord.round, lastRecord.match) })}>
-                ↶ Undo final
+                {t('groupTournament.undoFinal')}
               </Button>
               <Button variant="ghost" onClick={() => dispatch({ t: 'tn-reset' })}>
-                New tournament
+                {t('tournament.new')}
               </Button>
             </>
           )}
@@ -342,11 +352,11 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
     >
       {records.length > 0 && (
         <details className="rounded-xl bg-panel p-4 text-sm" open>
-          <summary className="cursor-pointer font-semibold">Every vote</summary>
+          <summary className="cursor-pointer font-semibold">{t('groupTournament.everyVote')}</summary>
           <div className="mt-3 space-y-1">
             {[...records].reverse().map(({ record, loserId, won, lost }) => (
               <p key={matchKey(record.round, record.match)} className="flex flex-wrap gap-x-2 text-muted">
-                <span className="w-28 shrink-0">{roundName(bracket.size, record.round)}</span>
+                <span className="w-28 shrink-0">{roundLabel(bracket.size, record.round)}</span>
                 <span className="text-text">{seedOf.get(record.winnerId)!.film.name}</span>
                 {loserId && (
                   <>
@@ -356,7 +366,7 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
                     <span>{seedOf.get(loserId)!.film.name}</span>
                   </>
                 )}
-                {loserId && won === lost && won > 0 && <span className="text-lb-orange">(tie)</span>}
+                {loserId && won === lost && won > 0 && <span className="text-lb-orange">{t('groupTournament.tieShort')}</span>}
               </p>
             ))}
           </div>

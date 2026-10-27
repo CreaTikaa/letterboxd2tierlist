@@ -53,12 +53,13 @@ export function roundCount(size: number): number {
   return Math.log2(size)
 }
 
-export function roundName(size: number, round: number): string {
+export type RoundKind = 'final' | 'semi' | 'quarter' | 'roundOf'
+
+/** What a round is called: final, semi-finals, quarter-finals, or "round of N" (N films left). */
+export function roundInfo(size: number, round: number): { kind: RoundKind; remaining: number } {
   const remaining = size / 2 ** round
-  if (remaining === 2) return 'Final'
-  if (remaining === 4) return 'Semi-finals'
-  if (remaining === 8) return 'Quarter-finals'
-  return `Round of ${remaining}`
+  const kind: RoundKind = remaining === 2 ? 'final' : remaining === 4 ? 'semi' : remaining === 8 ? 'quarter' : 'roundOf'
+  return { kind, remaining }
 }
 
 export function entrants(t: Tournament, round: number, match: number): [string | null, string | null] {
@@ -160,11 +161,9 @@ export function upsets(t: Tournament): Upset[] {
   return result.sort((a, b) => b.gap - a.gap)
 }
 
-export function placeLabel(place: number): string {
-  if (place === 1) return 'Champion'
-  if (place === 2) return 'Runner-up'
-  const end = place * 2 - 2
-  return `${place}${place === 3 ? 'rd' : 'th'}–${end}th`
+/** Range of finishing positions sharing `place`: 1 → [1, 1], 2 → [2, 2], 3 → [3, 4], 5 → [5, 8]… */
+export function placeRange(place: number): [number, number] {
+  return place <= 2 ? [place, place] : [place, place * 2 - 2]
 }
 
 export const BRACKET_SIZES = [8, 16, 32, 64, 128, 256]

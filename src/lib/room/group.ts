@@ -106,7 +106,8 @@ export function anonymousOrder(showdown: Showdown): string[] {
   return shuffle(owners, seededRandom(`${showdown.round}:${owners.join(',')}`))
 }
 
-export const listLabel = (index: number) => `List ${String.fromCharCode(65 + (index % 26))}`
+/** "A", "B"… for anonymous lists. */
+export const listLetter = (index: number) => String.fromCharCode(65 + (index % 26))
 
 export interface GuessResults {
   /** Who guessed the most authors right. `total` is how many lists they could guess (everyone's but their own). */

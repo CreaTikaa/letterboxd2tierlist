@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { LANGUAGES, useT, type Language, type TKey } from '../i18n'
 import { routeHref, useRoute, type Route } from '../router'
 import { importFromFiles } from '../store/importFromFiles'
 import { useStore } from '../store/useStore'
@@ -19,15 +20,37 @@ export function Logo() {
   )
 }
 
-const NAV: { label: string; route: Route; pages: Route['page'][] }[] = [
-  { label: 'Tier list', route: { page: 'tierlist' }, pages: ['tierlist'] },
-  { label: 'Rooms', route: { page: 'rooms' }, pages: ['rooms', 'room'] },
-  { label: 'Tournament', route: { page: 'tournament' }, pages: ['tournament'] },
+const NAV: { label: TKey; route: Route; pages: Route['page'][] }[] = [
+  { label: 'nav.tierList', route: { page: 'tierlist' }, pages: ['tierlist'] },
+  { label: 'nav.rooms', route: { page: 'rooms' }, pages: ['rooms', 'room'] },
+  { label: 'nav.tournament', route: { page: 'tournament' }, pages: ['tournament'] },
 ]
+
+export function LanguageSelect({ className = '' }: { className?: string }) {
+  const t = useT()
+  const language = useStore((s) => s.language)
+  const setLanguage = useStore((s) => s.setLanguage)
+  return (
+    <select
+      value={language}
+      onChange={(e) => setLanguage(e.target.value as Language)}
+      aria-label={t('header.language')}
+      title={t('header.language')}
+      className={`rounded-md border border-line bg-ink px-2 py-1 text-sm text-muted hover:text-text focus:border-lb-blue focus:outline-none ${className}`}
+    >
+      {LANGUAGES.map((l) => (
+        <option key={l.code} value={l.code}>
+          {l.name}
+        </option>
+      ))}
+    </select>
+  )
+}
 
 export function Header({ onSettings, onExport }: { onSettings: () => void; onExport: () => void }) {
   const films = useStore((s) => s.films)
   const route = useRoute()
+  const t = useT()
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -44,7 +67,7 @@ export function Header({ onSettings, onExport }: { onSettings: () => void; onExp
                 aria-current={active ? 'page' : undefined}
                 className={`rounded-md px-3 py-1.5 text-sm transition ${active ? 'bg-raised text-text' : 'text-muted hover:text-text'}`}
               >
-                {item.label}
+                {t(item.label)}
               </a>
             )
           })}
@@ -52,17 +75,18 @@ export function Header({ onSettings, onExport }: { onSettings: () => void; onExp
         <div className="ml-auto flex items-center gap-2">
           {route.page === 'tierlist' && films.length > 0 && (
             <>
-              <span className="hidden text-sm text-muted lg:inline">{films.length} films</span>
-              <Button variant="ghost" onClick={() => inputRef.current?.click()} title="Import a newer Letterboxd export">
-                Re-import
+              <span className="hidden text-sm text-muted lg:inline">{t('common.films', { count: films.length })}</span>
+              <Button variant="ghost" onClick={() => inputRef.current?.click()} title={t('header.reimportTitle')}>
+                {t('header.reimport')}
               </Button>
               <Button variant="primary" onClick={onExport}>
-                Export
+                {t('header.export')}
               </Button>
             </>
           )}
-          <Button variant="ghost" onClick={onSettings} aria-label="Settings" title="Settings">
-            ⚙ <span className="hidden sm:inline">Settings</span>
+          <LanguageSelect />
+          <Button variant="ghost" onClick={onSettings} aria-label={t('common.settings')} title={t('common.settings')}>
+            ⚙ <span className="hidden sm:inline">{t('common.settings')}</span>
           </Button>
           <input
             ref={inputRef}
