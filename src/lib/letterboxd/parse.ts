@@ -1,5 +1,5 @@
 import Papa from 'papaparse'
-import type { Film } from '../types'
+import type { Film, LetterboxdList } from '../types'
 
 type Row = Record<string, string>
 
@@ -59,7 +59,7 @@ export function rowToFilm(row: Row): Film | null {
   }
 }
 
-const titleKey = (film: Film) => `${film.name.toLowerCase()}|${film.year ?? ''}`
+export const titleKey = (film: Pick<Film, 'name' | 'year'>) => `${film.name.toLowerCase()}|${film.year ?? ''}`
 
 /**
  * Builds the film library: every film from watched.csv, with ratings from ratings.csv merged in.
@@ -90,4 +90,43 @@ export function mergeExport({ watched, ratings }: ExportCsvs): Film[] {
     if (film) add({ ...film, watchedDate: null })
   }
   return [...byId.values()]
+}
+
+/** Marks films that appear in likes/films.csv (matched by URI, then title + year). */
+export function applyLikes(films: Film[], likesCsv: string): Film[] {
+  const liked = new Set<string>()
+  for (const row of parseCsv(likesCsv)) {
+    const film = rowToFilm(row)
+    if (!film) continue
+    if (film.uri) liked.add(film.uri)
+    liked.add(titleKey(film))
+  }
+  return films.map((film) => ((film.uri && liked.has(film.uri)) || liked.has(titleKey(film)) ? { ...film, liked: true } : film))
+}
+
+/**
+ * A list export: a "Letterboxd list export" line, a small table with the list's name, a blank
+ * line, then the entries (Position, Name, Year, URL…). Older or hand-made files may only have the
+ * entries table.
+ */
+export function parseList(text: string, fileName: string): LetterboxdList | null {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+  const id = fileName.split('/').pop()!.replace(/\.csv$/i, '')
+  let name = id.replace(/[-_]+/g, ' ')
+  let entriesStart = 0
+
+  const metaHeader = lines.findIndex((line) => /^date,name/i.test(line.trim()))
+  if (metaHeader >= 0 && metaHeader < 5) {
+    const meta = parseCsv(lines.slice(metaHeader, metaHeader + 2).join('\n'))[0]
+    if (meta?.name) name = meta.name
+    entriesStart = metaHeader + 2
+  }
+  const positionHeader = lines.findIndex((line, i) => i >= entriesStart && /^position,/i.test(line.trim()))
+  if (positionHeader >= 0) entriesStart = positionHeader
+  else while (entriesStart < lines.length && !lines[entriesStart].trim()) entriesStart++
+
+  const films = parseCsv(lines.slice(entriesStart).join('\n'))
+    .map(rowToFilm)
+    .filter((film): film is Film => film !== null)
+  return films.length ? { id, name, films } : null
 }

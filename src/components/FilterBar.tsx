@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { PeopleFilter } from './PeopleFilter'
 import { countByGenre, countByRating } from '../lib/filter'
 import { genreLabel, useT } from '../i18n'
 import { Trans } from '../i18n/Trans'
@@ -76,9 +77,11 @@ interface Props {
   extra?: ReactNode
   /** Poster matches, which carry genres; without them the genre row is hidden. */
   matches?: Record<string, Match>
+  /** Controls shown first on the second row (e.g. which films to start from). */
+  leading?: ReactNode
 }
 
-export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel, extra, matches }: Props) {
+export function FilterBar({ films, filters, onChange: setFilters, visibleCount, ratingLabel, extra, matches, leading }: Props) {
   const t = useT()
   const cardWidth = useStore((s) => s.cardWidth)
   const setCardWidth = useStore((s) => s.setCardWidth)
@@ -138,6 +141,7 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        {leading}
         <input
           type="search"
           placeholder={t('filters.search')}
@@ -151,6 +155,7 @@ export function FilterBar({ films, filters, onChange: setFilters, visibleCount, 
           –
           <YearInput placeholder={t('filters.yearTo')} value={filters.yearMax} onChange={(yearMax) => setFilters({ yearMax })} />
         </label>
+        {matches && <PeopleFilter films={films} value={filters.person ?? null} onChange={(person) => setFilters({ person })} />}
         <span className="text-muted">
           <Trans k="filters.showing" params={{ visible: visibleCount, total: films.length }} tags={{ b: (text) => <span className="font-semibold text-text">{text}</span> }} />
         </span>

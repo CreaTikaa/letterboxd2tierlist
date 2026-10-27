@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { LANGUAGES, useT, type Language, type TKey } from '../i18n'
+import { LANGUAGES, loadLanguage, useT, type Language, type TKey } from '../i18n'
 import { routeHref, useRoute, type Route } from '../router'
 import { importFromFiles } from '../store/importFromFiles'
 import { useStore } from '../store/useStore'
@@ -24,6 +24,7 @@ const NAV: { label: TKey; route: Route; pages: Route['page'][] }[] = [
   { label: 'nav.tierList', route: { page: 'tierlist' }, pages: ['tierlist'] },
   { label: 'nav.rooms', route: { page: 'rooms' }, pages: ['rooms', 'room'] },
   { label: 'nav.tournament', route: { page: 'tournament' }, pages: ['tournament'] },
+  { label: 'nav.rank', route: { page: 'rank' }, pages: ['rank'] },
 ]
 
 export function LanguageSelect({ className = '' }: { className?: string }) {
@@ -33,7 +34,11 @@ export function LanguageSelect({ className = '' }: { className?: string }) {
   return (
     <select
       value={language}
-      onChange={(e) => setLanguage(e.target.value as Language)}
+      // Switch once the dictionary is downloaded, so the page never shows a mix of languages.
+      onChange={(e) => {
+        const next = e.target.value as Language
+        void loadLanguage(next).then(() => setLanguage(next))
+      }}
       aria-label={t('header.language')}
       title={t('header.language')}
       className={`rounded-md border border-line bg-ink px-2 py-1 text-sm text-muted hover:text-text focus:border-lb-blue focus:outline-none ${className}`}

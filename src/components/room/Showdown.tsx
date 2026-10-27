@@ -3,7 +3,8 @@ import { anonymousOrder, groupFilms, guessResults, listLetter, pickShowdownFilms
 import { useT } from '../../i18n'
 import { Trans } from '../../i18n/Trans'
 import type { ShowdownMode, Showdown as ShowdownState } from '../../lib/room/types'
-import { autoFill, clearTiers, defaultRatingMap, placedIds } from '../../lib/tiers'
+import { useHistory } from '../../hooks/useHistory'
+import { autoFill, clearTiers, defaultRatingMap, placedIds, tiersEqual } from '../../lib/tiers'
 import type { Film, Match, PoolSort, Tier } from '../../lib/types'
 import { useRoom, useShowdownDrafts } from '../../store/useRoom'
 import { useStore } from '../../store/useStore'
@@ -149,6 +150,7 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
   const ownFilmById = useMemo(() => new Map(films.map((f) => [f.id, f])), [films])
   const unplaced = films.length - placedIds(tiers).size
   const onTiersChange = useCallback((next: Tier[]) => setDraft(draftKey, next), [setDraft, draftKey])
+  const history = useHistory(tiers, onTiersChange, tiersEqual)
   const openFilm = useCallback((film: Film) => setEditingFilm(film), [setEditingFilm])
 
   const online = [me, ...Object.values(view.peers).map((p) => p.memberId)]
@@ -198,10 +200,11 @@ function Ranking({ showdown, filmById }: { showdown: ShowdownState; filmById: Ma
           tiers={tiers}
           films={films}
           matches={matches}
-          onTiersChange={onTiersChange}
+          onTiersChange={history.set}
+          history={history}
           poolSort={poolSort}
           onPoolSortChange={setPoolSort}
-          onAutoFill={() => onTiersChange(autoFill(tiers, films, defaultRatingMap(tiers)))}
+          onAutoFill={() => history.set(autoFill(tiers, films, defaultRatingMap(tiers)))}
           onFilmClick={openFilm}
           hint={unplaced ? t('showdown.leftToPlace', { count: unplaced }) : t('showdown.allPlaced')}
           toolbar={

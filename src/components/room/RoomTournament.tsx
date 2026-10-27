@@ -34,6 +34,8 @@ import {
   type CardState,
 } from '../tournament/shared'
 import { useSeedLookup } from '../tournament/useSeedLookup'
+import { sharedTournamentFrom } from '../../lib/share'
+import { ShareLinkButton } from '../ShareLinkButton'
 import { Button, inputClass } from '../ui'
 import { MemberTag } from './names'
 import { useNameOf } from './useNameOf'
@@ -327,6 +329,11 @@ function Results({ tournament, bracket }: { tournament: RoomTournamentState; bra
           <Button variant="primary" disabled={exporting} onClick={() => void exportPng()}>
             {exporting ? t('common.rendering') : t('common.downloadImage')}
           </Button>
+          <ShareLinkButton
+            variant="secondary"
+            label={t('share.short')}
+            build={() => ({ kind: 'tournament', tournament: sharedTournamentFrom(t('groupTournament.imageTitle', { room: view.state.id }), bracket, matches) })}
+          />
           <Button
             onClick={() => {
               if (!confirm(t('groupTournament.sendConfirm'))) return

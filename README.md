@@ -33,6 +33,13 @@ Rooms are **peer-to-peer** (WebRTC via [Trystero](https://github.com/dmotz/tryst
 - Optionally limit the bracket to one genre.
 - **Send to my tier list** turns the result into tiers: champion in S, runner-up in A, semi-finalists in B, and so on. In rooms, it sends the result to the group board.
 
+### Rank everything, share and compare
+
+- **Rank everything**: pick between two films until every film has an exact place (break ties inside each star rating, or a full ranking). Progress is saved; the result can go to the tier list or be shared.
+- **Share links** for tier lists, tournament results (with the full bracket) and rankings. A shared tier list can be **compared** with yours or with another link (agreement %, biggest disagreements).
+- **Likes and lists** from the export can be used as the set of films; filter by **director or actor** (TMDB key needed).
+- **Tap to place** on phones (tap a poster, then a tier), keys 1–9 / 0, and **Ctrl+Z / Ctrl+Shift+Z** undo/redo on every board.
+
 ### Languages
 
 English, French, Simplified Chinese and Brazilian Portuguese. The app follows your browser's language, and you can switch it from the header or Settings. Everything is translated, including exported images and the TierMaker pack.
@@ -84,6 +91,10 @@ src/
 The room protocol is host-authoritative. The host numbers every change and broadcasts it; followers apply changes in order and fetch a full snapshot when they detect a gap. When two hosts meet, an *anchored* copy (the creator's, one received from the room, or a saved one) beats a fresh copy from someone who just opened the link; otherwise the newer room wins. The protocol sits behind a small `Transport` interface, so `session.test.ts` runs it against an in-memory network to test joining, syncing, host hand-off and room revival.
 
 Pushing to `main` runs lint, tests and build, then deploys to GitHub Pages (`.github/workflows/deploy.yml`).
+
+### Browser tests
+
+`npm run test:e2e` runs the Playwright tests in `e2e/` against a production build (TMDB is mocked; rooms use real peer-to-peer connections). Run `npx playwright install chromium` once, or set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome.
 
 ## Credits
 

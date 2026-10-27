@@ -10,10 +10,12 @@ interface Props {
   onFilmClick?: (film: Film) => void
   /** Wider label column with bigger text, for full-page lists. */
   large?: boolean
+  /** Films shown faded (e.g. not in the other list being compared). */
+  dimmed?: Set<string>
 }
 
 /** Read-only, compact tier list (used to compare boards side by side). */
-export function StaticTierList({ tiers, filmById, matches, cardWidth = 40, onFilmClick, large = false }: Props) {
+export function StaticTierList({ tiers, filmById, matches, cardWidth = 40, onFilmClick, large = false, dimmed }: Props) {
   const rowHeight = Math.round(cardWidth * 1.5)
   return (
     <div className="overflow-hidden rounded-md border border-black bg-[#1a1a17]">
@@ -30,7 +32,13 @@ export function StaticTierList({ tiers, filmById, matches, cardWidth = 40, onFil
               const film = filmById.get(id)
               if (!film) return null
               return (
-                <button key={id} type="button" onClick={() => onFilmClick?.(film)} className="cursor-pointer">
+                <button
+                  key={id}
+                  type="button"
+                  disabled={!onFilmClick}
+                  onClick={() => onFilmClick?.(film)}
+                  className={`disabled:cursor-default ${dimmed?.has(id) ? 'opacity-30' : ''}`}
+                >
                   <PosterCard film={film} match={matches[id]} width={cardWidth} showRating={false} />
                 </button>
               )

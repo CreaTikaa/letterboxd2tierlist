@@ -1,16 +1,44 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { AppError } from '../lib/errors'
 import { TmdbError } from '../lib/tmdb/client'
 import { useStore } from '../store/useStore'
 import { en, type Messages } from './en'
-import { fr } from './fr'
 import { localeOf, type Language } from './languages'
-import { pt } from './pt'
-import { zh } from './zh'
 
 export { LANGUAGES, detectLanguage, localeOf, type Language } from './languages'
 
-const DICTIONARIES: Record<Language, Messages> = { en, fr, zh, pt }
+// English ships with the app; other languages are downloaded when chosen.
+const LOADERS: Record<Exclude<Language, 'en'>, () => Promise<Messages>> = {
+  fr: () => import('./fr').then((m) => m.fr),
+  zh: () => import('./zh').then((m) => m.zh),
+  pt: () => import('./pt').then((m) => m.pt),
+}
+const loaded: Partial<Record<Language, Messages>> = { en }
+const listeners = new Set<() => void>()
+
+export function isLanguageLoaded(language: Language): boolean {
+  return Boolean(loaded[language])
+}
+
+export async function loadLanguage(language: Language): Promise<void> {
+  if (loaded[language]) return
+  loaded[language] = await LOADERS[language as Exclude<Language, 'en'>]()
+  listeners.forEach((listener) => listener())
+}
+
+const subscribeLoaded = (listener: () => void) => {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/** Loads the language's dictionary if needed; true once it's ready. */
+export function useLanguageReady(language: Language): boolean {
+  const ready = useSyncExternalStore(subscribeLoaded, () => isLanguageLoaded(language))
+  useEffect(() => {
+    void loadLanguage(language)
+  }, [language])
+  return ready
+}
 
 type MessageKey = keyof Messages
 /** Plural keys are written `key_one` / `key_other`…; callers use the bare `key` with a `count`. */
@@ -27,7 +55,7 @@ function pluralCategory(language: Language, count: number, type: Intl.PluralRule
 }
 
 function lookup(language: Language, key: string): string | undefined {
-  return (DICTIONARIES[language] as Record<string, string>)[key] ?? (en as Record<string, string>)[key]
+  return ((loaded[language] ?? en) as Record<string, string>)[key] ?? (en as Record<string, string>)[key]
 }
 
 export function translate(language: Language, key: TKey, params?: Params): string {
